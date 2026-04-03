@@ -60,7 +60,7 @@ public class Animation {
             }
         }
         
-        while (animTime > getFrame(currFrameIndex).endTime) {
+        while (currFrameIndex < frames.size() - 1 && animTime >= getFrame(currFrameIndex).endTime) {
             currFrameIndex++;
         }
     }

@@ -11,9 +11,9 @@ import java.util.Map;
 public class StripAnimation {
     
     // Sprite sheet configuration constants
-    public static final int FRAME_WIDTH = 85;
-    public static final int FRAME_HEIGHT = 120;
-    public static final int FRAMES_PER_ROW = 16;
+    public static final int FRAME_WIDTH = 90;
+    public static final int FRAME_HEIGHT = 130;
+    public static final int FRAMES_PER_ROW = 5;
     
     // Frame dimensions (can be customized via constructor)
     private int frameWidth;
@@ -137,45 +137,14 @@ public class StripAnimation {
         }
         
         StripAnimation stripAnim = new StripAnimation();
-        
-        // Extract frames for each direction row
-        BufferedImage[] row0Frames = stripAnim.extractFramesFromRow(spriteSheet, 0);
-        BufferedImage[] row1Frames = stripAnim.extractFramesFromRow(spriteSheet, 1);
-        BufferedImage[] row2Frames = stripAnim.extractFramesFromRow(spriteSheet, 2);
-        
-        // Create LEFT animation - Row 0, no flip
-        if (row0Frames.length > 0) {
-            animations.put(0, stripAnim.createAnimationFromFrames(row0Frames, frameDuration, false));
-        }
-        
-        // Create RIGHT animation - Row 0, flipped horizontally
-        if (row0Frames.length > 0) {
-            animations.put(1, stripAnim.createAnimationFromFrames(row0Frames, frameDuration, true));
-        }
-        
-        // Create UP+LEFT animation - Row 0, no flip (same as LEFT)
-        if (row0Frames.length > 0) {
-            animations.put(2, stripAnim.createAnimationFromFrames(row0Frames, frameDuration, false));
-        }
-        
-        // Create UP+RIGHT animation - Row 0, flipped horizontally
-        if (row0Frames.length > 0) {
-            animations.put(3, stripAnim.createAnimationFromFrames(row0Frames, frameDuration, true));
-        }
-        
-        // Create DOWN animation - Row 1 (front view), no flip
-        if (row1Frames.length > 0) {
-            animations.put(4, stripAnim.createAnimationFromFrames(row1Frames, frameDuration, false));
-        }
-        
-        // Create DOWN+LEFT animation - Row 2 (3/4 view), no flip
-        if (row2Frames.length > 0) {
-            animations.put(5, stripAnim.createAnimationFromFrames(row2Frames, frameDuration, false));
-        }
-        
-        // Create DOWN+RIGHT animation - Row 2 (3/4 view), flipped horizontally
-        if (row2Frames.length > 0) {
-            animations.put(6, stripAnim.createAnimationFromFrames(row2Frames, frameDuration, true));
+
+        // New sprite sheet rows, top to bottom:
+        // 0 UP, 1 UP+RIGHT, 2 RIGHT, 3 DOWN+RIGHT, 4 DOWN, 5 DOWN+LEFT, 6 LEFT, 7 UP+LEFT
+        for (int rowIndex = 0; rowIndex < 8; rowIndex++) {
+            BufferedImage[] frames = stripAnim.extractFramesFromRow(spriteSheet, rowIndex);
+            if (frames.length > 0) {
+                animations.put(rowIndex, stripAnim.createAnimationFromFrames(frames, frameDuration, false));
+            }
         }
         
         return animations;
