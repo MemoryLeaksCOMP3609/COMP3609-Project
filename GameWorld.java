@@ -2,6 +2,9 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 
 public class GameWorld {
+    private static final int COLLECTIBLE_SIZE = 40;
+    private static final int COLLECTIBLE_MIN_DISTANCE = 200;
+
     private final int worldWidth;
     private final int worldHeight;
     private final WorldGenerator worldGenerator;
@@ -35,11 +38,16 @@ public class GameWorld {
         playerData = new Player();
         player = new PlayerSprite(panel, playerData, playerStartX, playerStartY, worldWidth, worldHeight);
         solidObjects = worldGenerator.createSolidObjects(25, playerStartX, playerStartY, 250);
-        collectibles = worldGenerator.createCollectibles(solidObjects, winCollectibles, 40, 200);
+        collectibles = worldGenerator.createCollectibles(solidObjects, winCollectibles, COLLECTIBLE_SIZE, COLLECTIBLE_MIN_DISTANCE);
         animatedSprites = worldGenerator.createAnimatedSprites(panel);
         arrowSprite = new ArrowSprite();
         cameraX = 0;
         cameraY = 0;
+    }
+
+    public void respawnCollectedCollectible(Collectible collectedCollectible) {
+        collectibles.remove(collectedCollectible);
+        collectibles.add(worldGenerator.createCollectible(solidObjects, collectibles, COLLECTIBLE_SIZE, COLLECTIBLE_MIN_DISTANCE));
     }
 
     public void updateCamera(int panelWidth, int panelHeight) {

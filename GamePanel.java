@@ -12,7 +12,7 @@ public class GamePanel extends JPanel {
     private static final int PANEL_HEIGHT = 600;
     private static final int WORLD_WIDTH = 2500;
     private static final int WORLD_HEIGHT = 2500;
-    private static final int WIN_COLLECTIBLES = 5;
+    private static final int TOTAL_COLLECTIBLES = 11;
     private static final int EXPERIENCE_PER_COLLECTIBLE = 25;
     private static final long GOLDEN_TINT_DURATION = 1000;
     private static final int GOLDEN_TINT_COLOR = 0x80FFD700;
@@ -64,7 +64,7 @@ public class GamePanel extends JPanel {
     }
 
     public void createGameEntities() {
-        world.initializeEntities(this, WIN_COLLECTIBLES);
+        world.initializeEntities(this, TOTAL_COLLECTIBLES);
         sessionState.setCollectedCount(0);
         sessionState.setTotalCollectibles(world.getCollectibles().size());
     }
@@ -271,10 +271,10 @@ public class GamePanel extends JPanel {
                 if (playerData != null && playerData.gainExperience(EXPERIENCE_PER_COLLECTIBLE)) {
                     sessionState.setActiveEffectName("Level Up");
                 }
-
-                if (sessionState.getCollectedCount() >= WIN_COLLECTIBLES) {
-                    triggerGameOver(true);
-                }
+                world.respawnCollectedCollectible(collectible);
+                sessionState.setTotalCollectibles(world.getCollectibles().size());
+                world.updateScreenPositions();
+                break;
             }
         }
     }
@@ -394,9 +394,7 @@ public class GamePanel extends JPanel {
     }
 
     private void drawToBuffer(Graphics2D g2) {
-        boolean applyGrayScale = sessionState.isGameOver()
-            && sessionState.getCollectedCount() >= WIN_COLLECTIBLES
-            && screenGrayScaleFX != null;
+        boolean applyGrayScale = sessionState.isGameOver() && screenGrayScaleFX != null;
 
         g2.setColor(Color.BLACK);
         g2.fillRect(0, 0, getWidth(), getHeight());
