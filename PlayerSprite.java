@@ -1,5 +1,6 @@
 import java.awt.Graphics2D;
 import java.awt.Image;
+import java.awt.Color;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.Map;
@@ -21,8 +22,10 @@ public class PlayerSprite extends Sprite {
     private static final long SPEED_BOOST_DURATION = 1000; // 1 second
     private static final int SPEED_BOOST_MULTIPLIER = 3; // 3x speed
     private static final long RUN_FRAME_DURATION = 40;
+    private static final long DAMAGE_FLASH_DURATION_MS = 120;
     private int screenX;
     private int screenY;
+    private long damageFlashRemainingMs;
     
     // Animation states
     public static final int STATE_IDLE = 0;
@@ -91,6 +94,7 @@ public class PlayerSprite extends Sprite {
         preciseWorldY = yPos;
         screenX = xPos;
         screenY = yPos;
+        damageFlashRemainingMs = 0;
         width = 50;
         height = 50;
         
@@ -268,7 +272,11 @@ public class PlayerSprite extends Sprite {
 
         BufferedImage currentFrame = getCurrentBufferedImage();
         if (currentFrame != null) {
-            g2.drawImage(currentFrame, screenX, screenY, width, height, null);
+            BufferedImage frameToDraw = currentFrame;
+            if (damageFlashRemainingMs > 0) {
+                frameToDraw = ImageManager.tintVisiblePixels(currentFrame, Color.RED, 0.45f);
+            }
+            g2.drawImage(frameToDraw, screenX, screenY, width, height, null);
         }
     }
     
@@ -299,6 +307,14 @@ public class PlayerSprite extends Sprite {
     
     public int getScreenY() {
         return screenY;
+    }
+
+    public int getCenterX() {
+        return worldX + width / 2;
+    }
+
+    public int getCenterY() {
+        return worldY + height / 2;
     }
     
 
@@ -360,5 +376,13 @@ public class PlayerSprite extends Sprite {
 
     public Player getPlayerData() {
         return playerData;
+    }
+
+    public void triggerDamageFlash() {
+        damageFlashRemainingMs = DAMAGE_FLASH_DURATION_MS;
+    }
+
+    public void updateDamageFlash(long deltaTimeMs) {
+        damageFlashRemainingMs = Math.max(0, damageFlashRemainingMs - deltaTimeMs);
     }
 }

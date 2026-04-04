@@ -4,6 +4,7 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
+import java.util.Iterator;
 
 public class GamePanel extends JPanel {
     private static final int EMBEDDED_PIXEL_THRESHOLD = 12;
@@ -18,6 +19,15 @@ public class GamePanel extends JPanel {
     private static final int GOLDEN_TINT_COLOR = 0x80FFD700;
     private static final long GAME_OVER_EXIT_DELAY = 1500;
     private static final int TARGET_FPS = 60;
+    private static final int PLAYER_ATTACK_RANGE = 500;
+    private static final int BAT_STOP_DISTANCE = 200;
+    private static final int PLAYER_BULLET_RADIUS = 6;
+    private static final int BAT_BULLET_RADIUS = 5;
+    private static final double PLAYER_BULLET_SPEED = 12.0;
+    private static final double BAT_BULLET_SPEED = 8.0;
+    private static final int PLAYER_BASE_DAMAGE = 10;
+    private static final long PLAYER_BASE_FIRE_INTERVAL_MS = 1000;
+    private static final long BAT_FIRE_INTERVAL_MS = 3000;
 
     private final GameSessionState sessionState;
     private final GameInputState inputState;
@@ -32,6 +42,7 @@ public class GamePanel extends JPanel {
     private InfoPanel infoPanel;
     private Thread gameThread;
     private volatile boolean gameThreadRunning;
+    private long playerShotCooldownMs;
 
     public GamePanel() {
         this(null);
@@ -61,6 +72,7 @@ public class GamePanel extends JPanel {
 
         gameThread = null;
         gameThreadRunning = false;
+        playerShotCooldownMs = 0;
     }
 
     public void createGameEntities() {
@@ -77,6 +89,7 @@ public class GamePanel extends JPanel {
         sessionState.resetForNewGame();
         screenGrayScaleFX = null;
         createGameEntities();
+        playerShotCooldownMs = 0;
         soundManager.playBackgroundMusic();
         startGameThread();
         repaint();
@@ -123,6 +136,9 @@ public class GamePanel extends JPanel {
 
                     if (sessionState.isGameRunning() && !sessionState.isGamePaused()) {
                         updatePlayer(deltaTimeMs);
+                        updateEnemies(deltaTimeMs);
+                        updateProjectiles(deltaTimeMs);
+                        world.updateScreenPositions();
                         checkCollisions();
                         updateEffects();
                         updateFPSFromGameThread();
@@ -209,11 +225,13 @@ public class GamePanel extends JPanel {
 
     public void updatePlayer(long deltaTime) {
         PlayerSprite player = world.getPlayer();
+        Player playerData = world.getPlayerData();
         if (player == null || !sessionState.isGameRunning() || sessionState.isGamePaused()) {
             return;
         }
 
         player.updateSpeedBoost(deltaTime);
+        player.updateDamageFlash(deltaTime);
 
         if (sessionState.isGoldenTintActive()) {
             long remainingGoldenTint = sessionState.getGoldenTintTimer() - deltaTime;
@@ -243,9 +261,79 @@ public class GamePanel extends JPanel {
         }
 
         player.update();
+        updatePlayerAutoFire(deltaTime, player, playerData);
         world.updateCamera(getWidth(), getHeight());
         world.updateScreenPositions();
         repaint();
+    }
+
+    private void updateEnemies(long deltaTime) {
+        PlayerSprite player = world.getPlayer();
+        if (player == null) {
+            return;
+        }
+
+        world.getEnemySpawner().update(deltaTime, player, world.getEnemies());
+
+        Iterator<Enemy> enemyIterator = world.getEnemies().iterator();
+        while (enemyIterator.hasNext()) {
+            Enemy enemy = enemyIterator.next();
+            if (enemy.isDead()) {
+                enemyIterator.remove();
+                continue;
+            }
+
+            enemy.updateDamageFlash(deltaTime);
+            enemy.updateAttackCooldown(deltaTime);
+            double distanceToPlayer = getDistance(enemy.getCenterX(), enemy.getCenterY(), player.getCenterX(), player.getCenterY());
+
+            if (enemy instanceof BatEnemy) {
+                if (distanceToPlayer > BAT_STOP_DISTANCE) {
+                    enemy.moveToward(player.getCenterX(), player.getCenterY(), BAT_STOP_DISTANCE, deltaTime);
+                } else {
+                    enemy.attack();
+                    if (enemy.canAttack()) {
+                        world.getProjectiles().add(createProjectile(enemy.getCenterX(), enemy.getCenterY(),
+                            player.getCenterX(), player.getCenterY(), BAT_BULLET_SPEED, BAT_BULLET_RADIUS,
+                            enemy.getContactDamage(), true, Color.ORANGE));
+                        enemy.setAttackCooldown(BAT_FIRE_INTERVAL_MS);
+                    }
+                }
+            } else {
+                enemy.moveToward(player.getCenterX(), player.getCenterY(), deltaTime);
+            }
+        }
+    }
+
+    private void updateProjectiles(long deltaTime) {
+        Iterator<Projectile> projectileIterator = world.getProjectiles().iterator();
+        while (projectileIterator.hasNext()) {
+            Projectile projectile = projectileIterator.next();
+            projectile.update(deltaTime);
+            if (!projectile.isActive() || projectile.isOutOfBounds(world.getWorldWidth(), world.getWorldHeight())) {
+                projectileIterator.remove();
+            }
+        }
+    }
+
+    private void updatePlayerAutoFire(long deltaTime, PlayerSprite player, Player playerData) {
+        playerShotCooldownMs = Math.max(0, playerShotCooldownMs - deltaTime);
+        Enemy nearestEnemy = findNearestEnemyInRange(player.getCenterX(), player.getCenterY(), PLAYER_ATTACK_RANGE);
+        if (nearestEnemy == null || playerShotCooldownMs > 0) {
+            return;
+        }
+
+        int damage = PLAYER_BASE_DAMAGE;
+        if (playerData != null) {
+            damage = (int) Math.round(PLAYER_BASE_DAMAGE * playerData.getDamageMultiplier());
+        }
+
+        world.getProjectiles().add(createProjectile(player.getCenterX(), player.getCenterY(),
+            nearestEnemy.getCenterX(), nearestEnemy.getCenterY(), PLAYER_BULLET_SPEED,
+            PLAYER_BULLET_RADIUS, damage, false, Color.CYAN));
+
+        double fireRateMultiplier = playerData != null ? playerData.getFireRateMultiplier() : 1.0;
+        playerShotCooldownMs = Math.max(80L, (long) Math.round(PLAYER_BASE_FIRE_INTERVAL_MS / fireRateMultiplier));
     }
 
     public void checkCollisions() {
@@ -275,6 +363,42 @@ public class GamePanel extends JPanel {
                 sessionState.setTotalCollectibles(world.getCollectibles().size());
                 world.updateScreenPositions();
                 break;
+            }
+        }
+
+        handleProjectileCollisions(player, playerData);
+    }
+
+    private void handleProjectileCollisions(PlayerSprite player, Player playerData) {
+        Iterator<Projectile> projectileIterator = world.getProjectiles().iterator();
+        while (projectileIterator.hasNext()) {
+            Projectile projectile = projectileIterator.next();
+            if (projectile.isEnemyOwned()) {
+                if (projectile.getBounds().intersects(player.getBoundingRectangle())) {
+                    if (playerData != null) {
+                        playerData.takeDamage(projectile.getDamage());
+                        player.triggerDamageFlash();
+                        if (playerData.getHealth() <= 0) {
+                            triggerGameOver(false);
+                        }
+                    }
+                    projectileIterator.remove();
+                }
+                continue;
+            }
+
+            boolean hitEnemy = false;
+            for (Enemy enemy : world.getEnemies()) {
+                if (!enemy.isDead() && projectile.getBounds().intersects(enemy.getBoundingRectangle())) {
+                    enemy.takeDamage(projectile.getDamage());
+                    projectileIterator.remove();
+                    hitEnemy = true;
+                    break;
+                }
+            }
+
+            if (hitEnemy) {
+                continue;
             }
         }
     }
@@ -421,6 +545,10 @@ public class GamePanel extends JPanel {
             collectible.draw(g2);
         }
 
+        for (Enemy enemy : world.getEnemies()) {
+            enemy.draw(g2);
+        }
+
         for (AnimatedSprite sprite : world.getAnimatedSprites()) {
             sprite.draw(g2);
         }
@@ -431,6 +559,10 @@ public class GamePanel extends JPanel {
 
         if (world.getArrowSprite() != null) {
             world.getArrowSprite().draw(g2);
+        }
+
+        for (Projectile projectile : world.getProjectiles()) {
+            projectile.draw(g2, world.getCameraX(), world.getCameraY());
         }
 
         for (ImageFX effect : effects) {
@@ -537,5 +669,45 @@ public class GamePanel extends JPanel {
 
     public String getActiveEffectName() {
         return sessionState.getActiveEffectName();
+    }
+
+    private Enemy findNearestEnemyInRange(int fromX, int fromY, int range) {
+        Enemy nearestEnemy = null;
+        double nearestDistance = Double.MAX_VALUE;
+
+        for (Enemy enemy : world.getEnemies()) {
+            if (enemy.isDead()) {
+                continue;
+            }
+
+            double distance = getDistance(fromX, fromY, enemy.getCenterX(), enemy.getCenterY());
+            if (distance <= range && distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestEnemy = enemy;
+            }
+        }
+
+        return nearestEnemy;
+    }
+
+    private Projectile createProjectile(int startX, int startY, int targetX, int targetY,
+                                        double speed, int radius, int damage,
+                                        boolean enemyOwned, Color color) {
+        double deltaX = targetX - startX;
+        double deltaY = targetY - startY;
+        double distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        if (distance == 0) {
+            distance = 1;
+        }
+
+        double velocityX = (deltaX / distance) * speed;
+        double velocityY = (deltaY / distance) * speed;
+        return new Projectile(startX, startY, velocityX, velocityY, radius, damage, enemyOwned, color);
+    }
+
+    private double getDistance(int startX, int startY, int endX, int endY) {
+        int deltaX = endX - startX;
+        int deltaY = endY - startY;
+        return Math.sqrt(deltaX * deltaX + deltaY * deltaY);
     }
 }

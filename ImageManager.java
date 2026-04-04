@@ -1,5 +1,6 @@
 import java.awt.Graphics2D;
 import java.awt.Image;
+import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -46,6 +47,43 @@ public class ImageManager {
         g2d.dispose();
         
         return copy;
+    }
+
+    public static BufferedImage tintVisiblePixels(BufferedImage src, Color tintColor, float blendAmount) {
+        if (src == null) {
+            return null;
+        }
+
+        float clampedBlend = Math.max(0.0f, Math.min(1.0f, blendAmount));
+        BufferedImage tinted = copyImage(src);
+        int width = tinted.getWidth();
+        int height = tinted.getHeight();
+        int tintRed = tintColor.getRed();
+        int tintGreen = tintColor.getGreen();
+        int tintBlue = tintColor.getBlue();
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int argb = tinted.getRGB(x, y);
+                int alpha = (argb >>> 24) & 0xFF;
+                if (alpha == 0) {
+                    continue;
+                }
+
+                int red = (argb >>> 16) & 0xFF;
+                int green = (argb >>> 8) & 0xFF;
+                int blue = argb & 0xFF;
+
+                int blendedRed = Math.round(red * (1.0f - clampedBlend) + tintRed * clampedBlend);
+                int blendedGreen = Math.round(green * (1.0f - clampedBlend) + tintGreen * clampedBlend);
+                int blendedBlue = Math.round(blue * (1.0f - clampedBlend) + tintBlue * clampedBlend);
+
+                int tintedArgb = (alpha << 24) | (blendedRed << 16) | (blendedGreen << 8) | blendedBlue;
+                tinted.setRGB(x, y, tintedArgb);
+            }
+        }
+
+        return tinted;
     }
     
     // Scale a BufferedImage to the specified width and height.

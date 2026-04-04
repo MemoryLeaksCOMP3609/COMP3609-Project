@@ -1,9 +1,12 @@
 import java.awt.Graphics2D;
+import java.awt.Color;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 
 public abstract class Enemy extends Sprite {
     private static final int DEFAULT_FRAME_COUNT = 5;
+    private static final double MOVEMENT_REFERENCE_FRAME_MS = 40.0;
+    private static final long DAMAGE_FLASH_DURATION_MS = 120;
 
     protected final String name;
     protected int maxHealth;
@@ -24,6 +27,9 @@ public abstract class Enemy extends Sprite {
     protected Animation deathAnimation;
     protected Animation currentAnimation;
     protected EnemyState state;
+    protected long attackCooldownMs;
+    protected double renderScale;
+    protected long damageFlashRemainingMs;
 
     protected Enemy(String name, int maxHealth, int movementSpeed, int contactDamage,
                     int scoreValue, int experienceReward, int startX, int startY) {
@@ -40,17 +46,24 @@ public abstract class Enemy extends Sprite {
         this.screenX = startX;
         this.screenY = startY;
         this.state = EnemyState.IDLE;
+        this.attackCooldownMs = 0;
+        this.renderScale = 1.0;
+        this.damageFlashRemainingMs = 0;
     }
 
     protected Animation loadStripAnimation(String imagePath, long frameDuration, boolean loop) {
+        return loadStripAnimation(imagePath, frameDuration, loop, DEFAULT_FRAME_COUNT);
+    }
+
+    protected Animation loadStripAnimation(String imagePath, long frameDuration, boolean loop, int frameCount) {
         BufferedImage spriteSheet = ImageManager.loadBufferedImage(imagePath);
         if (spriteSheet == null) {
             return null;
         }
 
-        int frameWidth = spriteSheet.getWidth() / DEFAULT_FRAME_COUNT;
+        int frameWidth = spriteSheet.getWidth() / frameCount;
         int frameHeight = spriteSheet.getHeight();
-        StripAnimation stripAnimation = new StripAnimation(frameWidth, frameHeight, DEFAULT_FRAME_COUNT);
+        StripAnimation stripAnimation = new StripAnimation(frameWidth, frameHeight, frameCount);
         BufferedImage[] frames = stripAnimation.extractFramesFromRow(spriteSheet, 0);
         Animation animation = new Animation(loop);
         for (BufferedImage frame : frames) {
@@ -100,30 +113,30 @@ public abstract class Enemy extends Sprite {
         screenY = worldY - cameraY;
     }
 
-    public void moveToward(int targetX, int targetY) {
+    public void moveToward(int targetX, int targetY, long deltaTimeMs) {
+        moveToward(targetX, targetY, 0, deltaTimeMs);
+    }
+
+    public void moveToward(int targetX, int targetY, int stopDistance, long deltaTimeMs) {
         if (isDead()) {
             return;
         }
 
-        int deltaX = targetX - worldX;
-        int deltaY = targetY - worldY;
+        double deltaX = targetX - worldX;
+        double deltaY = targetY - worldY;
+        double distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-        if (deltaX == 0 && deltaY == 0) {
+        if (distance <= stopDistance || distance == 0) {
             setAnimationForState(EnemyState.IDLE);
             return;
         }
 
-        if (deltaX > 0) {
-            worldX += movementSpeed;
-        } else if (deltaX < 0) {
-            worldX -= movementSpeed;
-        }
+        double moveDistance = movementSpeed * (deltaTimeMs / MOVEMENT_REFERENCE_FRAME_MS);
+        double directionX = deltaX / distance;
+        double directionY = deltaY / distance;
 
-        if (deltaY > 0) {
-            worldY += movementSpeed;
-        } else if (deltaY < 0) {
-            worldY -= movementSpeed;
-        }
+        worldX += (int) Math.round(directionX * moveDistance);
+        worldY += (int) Math.round(directionY * moveDistance);
 
         setAnimationForState(EnemyState.MOVING);
     }
@@ -140,6 +153,7 @@ public abstract class Enemy extends Sprite {
         }
 
         currentHealth = Math.max(0, currentHealth - damage);
+        triggerDamageFlash();
         if (currentHealth == 0) {
             die();
         }
@@ -158,7 +172,11 @@ public abstract class Enemy extends Sprite {
     public void draw(Graphics2D g2) {
         BufferedImage currentFrame = getCurrentBufferedImage();
         if (currentFrame != null) {
-            g2.drawImage(currentFrame, screenX, screenY, width, height, null);
+            BufferedImage frameToDraw = currentFrame;
+            if (damageFlashRemainingMs > 0) {
+                frameToDraw = ImageManager.tintVisiblePixels(currentFrame, Color.RED, 0.45f);
+            }
+            g2.drawImage(frameToDraw, screenX, screenY, width, height, null);
         }
     }
 
@@ -178,8 +196,8 @@ public abstract class Enemy extends Sprite {
     protected void syncDimensionsWithCurrentFrame() {
         BufferedImage currentFrame = getCurrentBufferedImage();
         if (currentFrame != null) {
-            width = currentFrame.getWidth();
-            height = currentFrame.getHeight();
+            width = Math.max(1, (int) Math.round(currentFrame.getWidth() * renderScale));
+            height = Math.max(1, (int) Math.round(currentFrame.getHeight() * renderScale));
         }
     }
 
@@ -213,5 +231,41 @@ public abstract class Enemy extends Sprite {
 
     public EnemyState getState() {
         return state;
+    }
+
+    public int getWorldX() {
+        return worldX;
+    }
+
+    public int getWorldY() {
+        return worldY;
+    }
+
+    public int getCenterX() {
+        return worldX + width / 2;
+    }
+
+    public int getCenterY() {
+        return worldY + height / 2;
+    }
+
+    public void updateAttackCooldown(long deltaTimeMs) {
+        attackCooldownMs = Math.max(0, attackCooldownMs - deltaTimeMs);
+    }
+
+    public boolean canAttack() {
+        return attackCooldownMs <= 0;
+    }
+
+    public void setAttackCooldown(long attackCooldownMs) {
+        this.attackCooldownMs = attackCooldownMs;
+    }
+
+    public void updateDamageFlash(long deltaTimeMs) {
+        damageFlashRemainingMs = Math.max(0, damageFlashRemainingMs - deltaTimeMs);
+    }
+
+    protected void triggerDamageFlash() {
+        damageFlashRemainingMs = DAMAGE_FLASH_DURATION_MS;
     }
 }

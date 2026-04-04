@@ -9,6 +9,7 @@ public class GameWorld {
     private final int worldHeight;
     private final WorldGenerator worldGenerator;
     private final BufferedImage backgroundImage;
+    private final EnemySpawner enemySpawner;
 
     private Player playerData;
     private PlayerSprite player;
@@ -16,6 +17,8 @@ public class GameWorld {
     private ArrayList<AnimatedSprite> animatedSprites;
     private ArrayList<SolidObject> solidObjects;
     private ArrayList<Collectible> collectibles;
+    private ArrayList<Enemy> enemies;
+    private ArrayList<Projectile> projectiles;
     private int cameraX;
     private int cameraY;
 
@@ -25,9 +28,12 @@ public class GameWorld {
         this.worldGenerator = new WorldGenerator(worldWidth, worldHeight);
         this.worldGenerator.loadImages();
         this.backgroundImage = ImageManager.loadBufferedImage("images/worldBackgroundSmall.png");
+        this.enemySpawner = new EnemySpawner(worldWidth, worldHeight);
         this.animatedSprites = new ArrayList<AnimatedSprite>();
         this.solidObjects = new ArrayList<SolidObject>();
         this.collectibles = new ArrayList<Collectible>();
+        this.enemies = new ArrayList<Enemy>();
+        this.projectiles = new ArrayList<Projectile>();
         this.cameraX = 0;
         this.cameraY = 0;
     }
@@ -41,6 +47,9 @@ public class GameWorld {
         collectibles = worldGenerator.createCollectibles(solidObjects, winCollectibles, COLLECTIBLE_SIZE, COLLECTIBLE_MIN_DISTANCE);
         animatedSprites = worldGenerator.createAnimatedSprites(panel);
         arrowSprite = new ArrowSprite();
+        enemies = new ArrayList<Enemy>();
+        projectiles = new ArrayList<Projectile>();
+        enemySpawner.reset();
         cameraX = 0;
         cameraY = 0;
     }
@@ -76,6 +85,11 @@ public class GameWorld {
             collectible.update();
         }
 
+        for (Enemy enemy : enemies) {
+            enemy.updateScreenPosition(cameraX, cameraY);
+            enemy.update();
+        }
+
         if (arrowSprite != null && player != null) {
             arrowSprite.update(player.getScreenX(), player.getScreenY(), collectibles);
         }
@@ -109,11 +123,31 @@ public class GameWorld {
         return collectibles;
     }
 
+    public ArrayList<Enemy> getEnemies() {
+        return enemies;
+    }
+
+    public ArrayList<Projectile> getProjectiles() {
+        return projectiles;
+    }
+
     public int getCameraX() {
         return cameraX;
     }
 
     public int getCameraY() {
         return cameraY;
+    }
+
+    public int getWorldWidth() {
+        return worldWidth;
+    }
+
+    public int getWorldHeight() {
+        return worldHeight;
+    }
+
+    public EnemySpawner getEnemySpawner() {
+        return enemySpawner;
     }
 }
