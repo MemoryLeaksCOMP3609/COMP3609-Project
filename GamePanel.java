@@ -26,6 +26,7 @@ public class GamePanel extends JPanel {
     private static final double FIRE_SPELL_SPEED = 9.0;
     private static final double FIRE_BALL_ORBIT_RADIUS = 90.0;
     private static final double FIRE_BALL_BASE_ANGULAR_SPEED = 0.0035;
+    private static final double FIRE_BALL_BASE_SCALE = 0.10;
     private static final double BAT_BULLET_SPEED = 8.0;
     private static final int PLAYER_BASE_DAMAGE = 10;
     private static final long FIRE_ARROW_BASE_FIRE_INTERVAL_MS = 500;
@@ -336,7 +337,8 @@ public class GamePanel extends JPanel {
     private void updatePlayerAutoFire(long deltaTime, PlayerSprite player, Player playerData) {
         WeaponType weaponType = playerData != null ? playerData.getWeaponType() : selectedWeapon;
         int projectileCount = getProjectileCount(playerData);
-        double projectileScale = getProjectileScale(playerData, 0.20);
+        double projectileScale = getProjectileScale(playerData,
+            weaponType == WeaponType.FIRE_BALL ? FIRE_BALL_BASE_SCALE : 0.20);
 
         if (weaponType == WeaponType.FIRE_BALL) {
             syncOrbitingFireballs(player, projectileCount, projectileScale, playerData);
