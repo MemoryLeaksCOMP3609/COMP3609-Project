@@ -9,10 +9,13 @@ import javax.swing.JPanel;
  * Player sprite with keyboard movement (arrow keys/WASD) and animation states
  */
 public class PlayerSprite extends Sprite {
+    private static final double MOVEMENT_REFERENCE_FRAME_MS = 40.0;
     private final Player playerData;
     
     private int worldX;
     private int worldY;
+    private double preciseWorldX;
+    private double preciseWorldY;
     private boolean speedBoostActive = false;
     private long speedBoostTimer = 0; // Time remaining in milliseconds
     private static final long SPEED_BOOST_DURATION = 1000; // 1 second
@@ -84,6 +87,8 @@ public class PlayerSprite extends Sprite {
         
         worldX = xPos;
         worldY = yPos;
+        preciseWorldX = xPos;
+        preciseWorldY = yPos;
         screenX = xPos;
         screenY = yPos;
         width = 50;
@@ -148,60 +153,61 @@ public class PlayerSprite extends Sprite {
         currentAnimation.start();
     }
     
-    public void move(int direction) {
+    public void move(int direction, long deltaTimeMs) {
         if (!panel.isVisible()) return;
         
         Animation animationToPlay = null;
+        double moveDistance = getCurrentMoveSpeed() * (deltaTimeMs / MOVEMENT_REFERENCE_FRAME_MS);
         
         switch (direction) {
             case DIR_LEFT:
-                worldX = worldX - getCurrentMoveSpeed();
+                preciseWorldX -= moveDistance;
                 facingDirection = DIR_LEFT;
                 currentState = STATE_RUN;
                 animationToPlay = runLeftAnim;
                 break;
             case DIR_RIGHT:
-                worldX = worldX + getCurrentMoveSpeed();
+                preciseWorldX += moveDistance;
                 facingDirection = DIR_RIGHT;
                 currentState = STATE_RUN;
                 animationToPlay = runRightAnim;
                 break;
             case DIR_UP:
-                worldY = worldY - getCurrentMoveSpeed();
+                preciseWorldY -= moveDistance;
                 facingDirection = DIR_UP;
                 currentState = STATE_RUN;
                 animationToPlay = runUpAnim;
                 break;
             case DIR_DOWN:
-                worldY = worldY + getCurrentMoveSpeed();
+                preciseWorldY += moveDistance;
                 facingDirection = DIR_DOWN;
                 currentState = STATE_RUN;
                 animationToPlay = runDownAnim;
                 break;
             case DIR_UP_LEFT:
-                worldX = worldX - getCurrentMoveSpeed();
-                worldY = worldY - getCurrentMoveSpeed();
+                preciseWorldX -= moveDistance;
+                preciseWorldY -= moveDistance;
                 facingDirection = DIR_UP_LEFT;
                 currentState = STATE_RUN;
                 animationToPlay = runUpLeftAnim;
                 break;
             case DIR_UP_RIGHT:
-                worldX = worldX + getCurrentMoveSpeed();
-                worldY = worldY - getCurrentMoveSpeed();
+                preciseWorldX += moveDistance;
+                preciseWorldY -= moveDistance;
                 facingDirection = DIR_UP_RIGHT;
                 currentState = STATE_RUN;
                 animationToPlay = runUpRightAnim;
                 break;
             case DIR_DOWN_LEFT:
-                worldX = worldX - getCurrentMoveSpeed();
-                worldY = worldY + getCurrentMoveSpeed();
+                preciseWorldX -= moveDistance;
+                preciseWorldY += moveDistance;
                 facingDirection = DIR_DOWN_LEFT;
                 currentState = STATE_RUN;
                 animationToPlay = runDownLeftAnim;
                 break;
             case DIR_DOWN_RIGHT:
-                worldX = worldX + getCurrentMoveSpeed();
-                worldY = worldY + getCurrentMoveSpeed();
+                preciseWorldX += moveDistance;
+                preciseWorldY += moveDistance;
                 facingDirection = DIR_DOWN_RIGHT;
                 currentState = STATE_RUN;
                 animationToPlay = runDownRightAnim;
@@ -212,8 +218,9 @@ public class PlayerSprite extends Sprite {
         setAnimationAndPlaySound(animationToPlay);
         
         // Clamp to world bounds
-        worldX = clamp(worldX, 0, worldWidth - width);
-        worldY = clamp(worldY, 0, worldHeight - height);
+        preciseWorldX = clampToWorldBounds(preciseWorldX, width, worldWidth);
+        preciseWorldY = clampToWorldBounds(preciseWorldY, height, worldHeight);
+        syncPrecisePositionToWorldPosition();
     }
     
     private void setAnimationAndPlaySound(Animation anim) {
@@ -318,10 +325,12 @@ public class PlayerSprite extends Sprite {
     
     public void setWorldX(int x) {
         worldX = x;
+        preciseWorldX = x;
     }
     
     public void setWorldY(int y) {
         worldY = y;
+        preciseWorldY = y;
     }
 
     private void syncDimensionsWithCurrentFrame() {
@@ -338,6 +347,15 @@ public class PlayerSprite extends Sprite {
             return moveSpeed * SPEED_BOOST_MULTIPLIER;
         }
         return moveSpeed;
+    }
+
+    private double clampToWorldBounds(double value, int spriteSize, int worldSize) {
+        return Math.max(0.0, Math.min(value, Math.max(0, worldSize - spriteSize)));
+    }
+
+    private void syncPrecisePositionToWorldPosition() {
+        worldX = (int) Math.round(preciseWorldX);
+        worldY = (int) Math.round(preciseWorldY);
     }
 
     public Player getPlayerData() {

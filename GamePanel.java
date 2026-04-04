@@ -17,7 +17,7 @@ public class GamePanel extends JPanel {
     private static final long GOLDEN_TINT_DURATION = 1000;
     private static final int GOLDEN_TINT_COLOR = 0x80FFD700;
     private static final long GAME_OVER_EXIT_DELAY = 1500;
-    private static final int TARGET_FRAME_TIME = 40;
+    private static final int TARGET_FPS = 60;
 
     private final GameSessionState sessionState;
     private final GameInputState inputState;
@@ -28,7 +28,6 @@ public class GamePanel extends JPanel {
 
     private ArrayList<ImageFX> effects;
     private GrayScaleFX screenGrayScaleFX;
-    private long lastFrameTime;
     private SoundManager soundManager;
     private InfoPanel infoPanel;
     private Thread gameThread;
@@ -60,7 +59,6 @@ public class GamePanel extends JPanel {
             System.out.println("Failed to load worldBackgroundSmall.png, using default dimensions");
         }
 
-        lastFrameTime = System.currentTimeMillis();
         gameThread = null;
         gameThreadRunning = false;
     }
@@ -116,12 +114,12 @@ public class GamePanel extends JPanel {
             @Override
             public void run() {
                 long frameStartedAt = System.nanoTime();
-                final long targetNanos = TARGET_FRAME_TIME * 1_000_000;
+                final long targetNanos = 1_000_000_000L / TARGET_FPS;
 
                 while (gameThreadRunning && !Thread.currentThread().isInterrupted()) {
                     long currentTimeNanos = System.nanoTime();
                     long elapsedNanos = currentTimeNanos - frameStartedAt;
-                    long deltaTimeMs = elapsedNanos / 1_000_000;
+                    long deltaTimeMs = Math.max(1L, elapsedNanos / 1_000_000);
 
                     if (sessionState.isGameRunning() && !sessionState.isGamePaused()) {
                         updatePlayer(deltaTimeMs);
@@ -145,8 +143,6 @@ public class GamePanel extends JPanel {
                     }
 
                     frameStartedAt = currentTimeNanos;
-                    lastFrameTime = System.currentTimeMillis();
-
                     long sleepTimeNanos = targetNanos - (System.nanoTime() - currentTimeNanos);
                     if (sleepTimeNanos > 0) {
                         try {
@@ -234,7 +230,7 @@ public class GamePanel extends JPanel {
         int moveDirection = inputState.resolveMovementDirection();
 
         if (moveDirection != 0) {
-            player.move(moveDirection);
+            player.move(moveDirection, deltaTime);
 
             if (!resolvePlayerSolidCollision(oldWorldX, oldWorldY, moveDirection)) {
                 player.setWorldX(oldWorldX);
@@ -490,7 +486,7 @@ public class GamePanel extends JPanel {
     }
 
     private void updateFPSFromGameThread() {
-        sessionState.setFps(1000 / TARGET_FRAME_TIME);
+        sessionState.setFps(TARGET_FPS);
     }
 
     public void setLeftKeyPressed(boolean pressed) {
