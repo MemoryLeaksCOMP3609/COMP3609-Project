@@ -20,6 +20,9 @@ public class GamePanel extends JPanel {
     private static final int GOLDEN_TINT_COLOR = 0x80FFD700;
     private static final long GAME_OVER_EXIT_DELAY = 1500;
     private static final int TARGET_FPS = 60;
+    private static final long TARGET_FRAME_NANOS = 1_000_000_000L / TARGET_FPS;
+    private static final int TIMER_POLL_DELAY_MS = 1;
+    private static final int MAX_UPDATES_PER_TICK = 4;
     private static final int PLAYER_ATTACK_RANGE = 500;
     private static final int BAT_STOP_DISTANCE = 200;
     private static final double FIRE_ARROW_SPEED = 12.0;
@@ -53,7 +56,18 @@ public class GamePanel extends JPanel {
     private long lastFrameTimeNanos;
     private long lastFpsSampleNanos;
     private long lastHudUpdateNanos;
+    private long lastProfilerSampleNanos;
+    private long accumulatedFrameNanos;
     private int renderedFramesSinceSample;
+    private long totalPlayerUpdateNanos;
+    private long totalEnemyUpdateNanos;
+    private long totalProjectileUpdateNanos;
+    private long totalAnimationUpdateNanos;
+    private long totalCollisionNanos;
+    private long totalEffectsUpdateNanos;
+    private long totalDrawNanos;
+    private int profiledUpdateCount;
+    private int profiledDrawCount;
 
     public GamePanel() {
         this(null);
@@ -89,7 +103,18 @@ public class GamePanel extends JPanel {
         lastFrameTimeNanos = System.nanoTime();
         lastFpsSampleNanos = System.nanoTime();
         lastHudUpdateNanos = System.nanoTime();
+        lastProfilerSampleNanos = System.nanoTime();
+        accumulatedFrameNanos = 0L;
         renderedFramesSinceSample = 0;
+        totalPlayerUpdateNanos = 0L;
+        totalEnemyUpdateNanos = 0L;
+        totalProjectileUpdateNanos = 0L;
+        totalAnimationUpdateNanos = 0L;
+        totalCollisionNanos = 0L;
+        totalEffectsUpdateNanos = 0L;
+        totalDrawNanos = 0L;
+        profiledUpdateCount = 0;
+        profiledDrawCount = 0;
     }
 
     public void createGameEntities() {
@@ -112,7 +137,18 @@ public class GamePanel extends JPanel {
         lastFrameTimeNanos = System.nanoTime();
         lastFpsSampleNanos = System.nanoTime();
         lastHudUpdateNanos = System.nanoTime();
+        lastProfilerSampleNanos = System.nanoTime();
+        accumulatedFrameNanos = 0L;
         renderedFramesSinceSample = 0;
+        totalPlayerUpdateNanos = 0L;
+        totalEnemyUpdateNanos = 0L;
+        totalProjectileUpdateNanos = 0L;
+        totalAnimationUpdateNanos = 0L;
+        totalCollisionNanos = 0L;
+        totalEffectsUpdateNanos = 0L;
+        totalDrawNanos = 0L;
+        profiledUpdateCount = 0;
+        profiledDrawCount = 0;
         sessionState.setFps(0);
         if (world.getPlayerData() != null) {
             world.getPlayerData().setWeaponType(selectedWeapon);
@@ -149,10 +185,10 @@ public class GamePanel extends JPanel {
             return;
         }
 
-        final int frameDelayMs = Math.max(1, (int) Math.round(1000.0 / TARGET_FPS));
         lastFrameTimeNanos = System.nanoTime();
-        gameLoopTimer = new Timer(frameDelayMs, event -> onGameTick());
-        gameLoopTimer.setCoalesce(true);
+        accumulatedFrameNanos = 0L;
+        gameLoopTimer = new Timer(TIMER_POLL_DELAY_MS, event -> onGameTick());
+        gameLoopTimer.setCoalesce(false);
         gameLoopTimer.start();
     }
 
@@ -167,17 +203,52 @@ public class GamePanel extends JPanel {
         long currentTimeNanos = System.nanoTime();
         long elapsedNanos = currentTimeNanos - lastFrameTimeNanos;
         lastFrameTimeNanos = currentTimeNanos;
-        long deltaTimeMs = Math.max(1L, Math.round(elapsedNanos / 1_000_000.0));
+        accumulatedFrameNanos += elapsedNanos;
 
         if (sessionState.isGameRunning() && !sessionState.isGamePaused()) {
-            updatePlayer(deltaTimeMs);
-            updateEnemies(deltaTimeMs);
-            updateProjectiles(deltaTimeMs);
-            world.updateWorldAnimations();
-            world.updateScreenPositions();
-            checkCollisions();
-            updateEffects();
-            repaint();
+            int updatesProcessed = 0;
+            boolean advancedFrame = false;
+
+            while (accumulatedFrameNanos >= TARGET_FRAME_NANOS && updatesProcessed < MAX_UPDATES_PER_TICK) {
+                long deltaTimeMs = Math.max(1L, Math.round(TARGET_FRAME_NANOS / 1_000_000.0));
+                long stageStartedAt = System.nanoTime();
+                updatePlayer(deltaTimeMs);
+                totalPlayerUpdateNanos += System.nanoTime() - stageStartedAt;
+
+                stageStartedAt = System.nanoTime();
+                updateEnemies(deltaTimeMs);
+                totalEnemyUpdateNanos += System.nanoTime() - stageStartedAt;
+
+                stageStartedAt = System.nanoTime();
+                updateProjectiles(deltaTimeMs);
+                totalProjectileUpdateNanos += System.nanoTime() - stageStartedAt;
+
+                stageStartedAt = System.nanoTime();
+                world.updateWorldAnimations();
+                world.updateScreenPositions();
+                totalAnimationUpdateNanos += System.nanoTime() - stageStartedAt;
+
+                stageStartedAt = System.nanoTime();
+                checkCollisions();
+                totalCollisionNanos += System.nanoTime() - stageStartedAt;
+
+                stageStartedAt = System.nanoTime();
+                updateEffects();
+                totalEffectsUpdateNanos += System.nanoTime() - stageStartedAt;
+
+                accumulatedFrameNanos -= TARGET_FRAME_NANOS;
+                updatesProcessed++;
+                advancedFrame = true;
+                profiledUpdateCount++;
+            }
+
+            if (updatesProcessed == MAX_UPDATES_PER_TICK && accumulatedFrameNanos > TARGET_FRAME_NANOS) {
+                accumulatedFrameNanos = TARGET_FRAME_NANOS;
+            }
+
+            if (advancedFrame) {
+                repaint();
+            }
         }
 
         if (sessionState.isGameOver() && sessionState.getGameOverTime() > 0) {
@@ -186,6 +257,8 @@ public class GamePanel extends JPanel {
                 System.exit(0);
             }
         }
+
+        logFrameProfilerIfReady();
     }
 
     public void triggerGameOver(boolean won) {
@@ -557,12 +630,17 @@ public class GamePanel extends JPanel {
         }
 
         if (doubleBufferImage != null) {
+            long drawStartedAt = System.nanoTime();
             drawToBuffer(doubleBufferG2);
+            totalDrawNanos += System.nanoTime() - drawStartedAt;
+            profiledDrawCount++;
             g.drawImage(doubleBufferImage, 0, 0, null);
         } else {
+            long drawStartedAt = System.nanoTime();
             drawToBuffer((Graphics2D) g);
+            totalDrawNanos += System.nanoTime() - drawStartedAt;
+            profiledDrawCount++;
         }
-
         updateRenderedFps();
     }
 
@@ -686,6 +764,52 @@ public class GamePanel extends JPanel {
             renderedFramesSinceSample = 0;
             lastFpsSampleNanos = now;
         }
+    }
+
+    private void logFrameProfilerIfReady() {
+        long now = System.nanoTime();
+        long elapsedNanos = now - lastProfilerSampleNanos;
+        if (elapsedNanos < 1_000_000_000L) {
+            return;
+        }
+
+        double updateCount = Math.max(1, profiledUpdateCount);
+        double drawCount = Math.max(1, profiledDrawCount);
+        double playerMs = totalPlayerUpdateNanos / 1_000_000.0 / updateCount;
+        double enemiesMs = totalEnemyUpdateNanos / 1_000_000.0 / updateCount;
+        double projectilesMs = totalProjectileUpdateNanos / 1_000_000.0 / updateCount;
+        double animationsMs = totalAnimationUpdateNanos / 1_000_000.0 / updateCount;
+        double collisionsMs = totalCollisionNanos / 1_000_000.0 / updateCount;
+        double effectsMs = totalEffectsUpdateNanos / 1_000_000.0 / updateCount;
+        double drawMs = totalDrawNanos / 1_000_000.0 / drawCount;
+
+        System.out.printf(
+            "Frame profile: fps=%d updates=%d draws=%d player=%.2fms enemies=%.2fms projectiles=%.2fms anim=%.2fms collisions=%.2fms effects=%.2fms draw=%.2fms enemiesAlive=%d projectilesLive=%d crystals=%d%n",
+            sessionState.getFps(),
+            profiledUpdateCount,
+            profiledDrawCount,
+            playerMs,
+            enemiesMs,
+            projectilesMs,
+            animationsMs,
+            collisionsMs,
+            effectsMs,
+            drawMs,
+            world.getEnemies().size(),
+            world.getProjectiles().size(),
+            world.getDroppedCrystals().size()
+        );
+
+        lastProfilerSampleNanos = now;
+        totalPlayerUpdateNanos = 0L;
+        totalEnemyUpdateNanos = 0L;
+        totalProjectileUpdateNanos = 0L;
+        totalAnimationUpdateNanos = 0L;
+        totalCollisionNanos = 0L;
+        totalEffectsUpdateNanos = 0L;
+        totalDrawNanos = 0L;
+        profiledUpdateCount = 0;
+        profiledDrawCount = 0;
     }
 
     public void setLeftKeyPressed(boolean pressed) {

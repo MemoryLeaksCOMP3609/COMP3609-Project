@@ -17,6 +17,7 @@ public class Projectile {
     private static final double MOVEMENT_REFERENCE_FRAME_MS = 40.0;
     private static final long DEFAULT_FRAME_DURATION_MS = 50;
     private static final long IMPACT_LINGER_MS = 120;
+    private static final long MAX_LIFETIME_MS = 5000;
     private static final Map<String, BufferedImage[]> FRAME_CACHE = new HashMap<String, BufferedImage[]>();
 
     private double worldX;
@@ -40,6 +41,7 @@ public class Projectile {
     private double orbitAngularSpeed;
     private long contactCooldownMs;
     private long impactLingerRemainingMs;
+    private long lifetimeRemainingMs;
     private long animationElapsedMs;
     private int currentFrameIndex;
     private boolean active;
@@ -70,6 +72,7 @@ public class Projectile {
         this.orbitAngularSpeed = 0.0;
         this.contactCooldownMs = 0;
         this.impactLingerRemainingMs = 0;
+        this.lifetimeRemainingMs = motionMode == MotionMode.ORBIT ? Long.MAX_VALUE : MAX_LIFETIME_MS;
         this.animationElapsedMs = 0;
         this.currentFrameIndex = 0;
         this.active = true;
@@ -77,7 +80,19 @@ public class Projectile {
     }
 
     public void update(long deltaTimeMs, GameWorld world, PlayerSprite player) {
+        if (!active) {
+            return;
+        }
+
         contactCooldownMs = Math.max(0, contactCooldownMs - deltaTimeMs);
+
+        if (lifetimeRemainingMs != Long.MAX_VALUE) {
+            lifetimeRemainingMs = Math.max(0, lifetimeRemainingMs - deltaTimeMs);
+            if (lifetimeRemainingMs == 0) {
+                active = false;
+                return;
+            }
+        }
 
         if (impacted) {
             impactLingerRemainingMs = Math.max(0, impactLingerRemainingMs - deltaTimeMs);
