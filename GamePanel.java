@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.Random;
 
 public class GamePanel extends JPanel {
+    private static final int EMBEDDED_PIXEL_THRESHOLD = 12;
+    private static final int MAX_PUSH_OUT_DISTANCE = 48;
     
     // Game state
     private boolean gameRunning;
@@ -405,15 +407,9 @@ public class GamePanel extends JPanel {
         if (moveDirection != 0) {
             player.move(moveDirection);
             
-            // Check collision after movement
-            Rectangle2D.Double playerBounds = player.getBoundingRectangle();
-            for (SolidObject solid : solidObjects) {
-                if (playerBounds.intersects(solid.getBoundingRectangle())) {
-                    // Revert position
-                    player.setWorldX(oldWorldX);
-                    player.setWorldY(oldWorldY);
-                    break;
-                }
+            if (!resolvePlayerSolidCollision(oldWorldX, oldWorldY, moveDirection)) {
+                player.setWorldX(oldWorldX);
+                player.setWorldY(oldWorldY);
             }
         }
         
@@ -488,7 +484,8 @@ public class GamePanel extends JPanel {
         // Check collectible collisions
         for (Collectible collectible : collectibles) {
             if (!collectible.isCollected() && 
-                playerBounds.intersects(collectible.getBoundingRectangle())) {
+                PixelCollision.intersects(playerBounds, player.getCurrentBufferedImage(),
+                                          collectible.getBoundingRectangle(), collectible.getCurrentBufferedImage())) {
                 collectible.collect();
                 collectedCount++;
                 soundManager.playClip("coinPickup", false);
@@ -506,6 +503,81 @@ public class GamePanel extends JPanel {
                     triggerGameOver(true);
                 }
             }
+        }
+    }
+
+    private boolean resolvePlayerSolidCollision(int fallbackX, int fallbackY, int moveDirection) {
+        Rectangle2D.Double playerBounds = player.getBoundingRectangle();
+        BufferedImage playerImage = player.getCurrentBufferedImage();
+
+        for (SolidObject solid : solidObjects) {
+            int overlapPixels = PixelCollision.countOverlappingPixels(playerBounds, playerImage,
+                                                                     solid.getBoundingRectangle(), solid.getImage(),
+                                                                     EMBEDDED_PIXEL_THRESHOLD);
+            if (overlapPixels > 0) {
+                if (overlapPixels >= EMBEDDED_PIXEL_THRESHOLD &&
+                    pushPlayerOutOfSolid(solid, moveDirection, fallbackX, fallbackY)) {
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private boolean pushPlayerOutOfSolid(SolidObject solid, int moveDirection, int fallbackX, int fallbackY) {
+        int originalX = player.getWorldX();
+        int originalY = player.getWorldY();
+        int[] reverseDirection = getReverseStep(moveDirection);
+
+        if (reverseDirection[0] == 0 && reverseDirection[1] == 0) {
+            return placePlayerAt(fallbackX, fallbackY);
+        }
+
+        for (int step = 1; step <= MAX_PUSH_OUT_DISTANCE; step++) {
+            int candidateX = originalX + reverseDirection[0] * step;
+            int candidateY = originalY + reverseDirection[1] * step;
+
+            if (placePlayerAt(candidateX, candidateY) && !isPlayerCollidingWithSolid(solid)) {
+                return true;
+            }
+        }
+
+        return placePlayerAt(fallbackX, fallbackY);
+    }
+
+    private boolean isPlayerCollidingWithSolid(SolidObject solid) {
+        return PixelCollision.intersects(player.getBoundingRectangle(), player.getCurrentBufferedImage(),
+                                         solid.getBoundingRectangle(), solid.getImage());
+    }
+
+    private boolean placePlayerAt(int worldX, int worldY) {
+        player.setWorldX(worldX);
+        player.setWorldY(worldY);
+        return true;
+    }
+
+    private int[] getReverseStep(int moveDirection) {
+        switch (moveDirection) {
+            case PlayerSprite.DIR_LEFT:
+                return new int[] { 1, 0 };
+            case PlayerSprite.DIR_RIGHT:
+                return new int[] { -1, 0 };
+            case PlayerSprite.DIR_UP:
+                return new int[] { 0, 1 };
+            case PlayerSprite.DIR_DOWN:
+                return new int[] { 0, -1 };
+            case PlayerSprite.DIR_UP_LEFT:
+                return new int[] { 1, 1 };
+            case PlayerSprite.DIR_UP_RIGHT:
+                return new int[] { -1, 1 };
+            case PlayerSprite.DIR_DOWN_LEFT:
+                return new int[] { 1, -1 };
+            case PlayerSprite.DIR_DOWN_RIGHT:
+                return new int[] { -1, -1 };
+            default:
+                return new int[] { 0, 0 };
         }
     }
     

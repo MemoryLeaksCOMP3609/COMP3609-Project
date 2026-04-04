@@ -1,4 +1,5 @@
 import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 import javax.swing.JPanel;
 
 /**
@@ -45,6 +46,14 @@ public class AnimatedSprite extends Sprite {
         } else if (image != null) {
             g2.drawImage(image, screenX, screenY, width, height, null);
         }
+    }
+
+    public BufferedImage getCurrentBufferedImage() {
+        if (animation != null && animation.getImage() != null) {
+            return PixelCollision.toBufferedImage(animation.getImage());
+        }
+
+        return PixelCollision.toBufferedImage(image);
     }
     
 }

@@ -41,4 +41,8 @@ public class SolidObject {
     public Rectangle2D.Double getBoundingRectangle() {
         return bounds;
     }
+
+    public BufferedImage getImage() {
+        return image;
+    }
 }

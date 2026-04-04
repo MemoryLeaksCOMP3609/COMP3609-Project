@@ -19,6 +19,7 @@ public class PlayerSprite extends Sprite {
     private long speedBoostTimer = 0; // Time remaining in milliseconds
     private static final long SPEED_BOOST_DURATION = 1000; // 1 second
     private static final int SPEED_BOOST_MULTIPLIER = 3; // 3x speed
+    private static final long RUN_FRAME_DURATION = 40;
     private int screenX;
     private int screenY;
     
@@ -43,24 +44,30 @@ public class PlayerSprite extends Sprite {
     private int worldHeight;
     
     // Sprite sheet configuration
-    private static final int FRAME_WIDTH = 85;
-    private static final int FRAME_HEIGHT = 120;
-    private static final int FRAMES_PER_ROW = 16;
+    private static final int FRAME_WIDTH = 90;
+    private static final int FRAME_HEIGHT = 130;
+    private static final int FRAMES_PER_ROW = 5;
     
     // Animation directions
-    public static final int ANIM_DIR_LEFT = 0;    // Row 0: running left (side view)
-    public static final int ANIM_DIR_DOWN = 1;   // Row 1: running toward screen (front view)
-    public static final int ANIM_DIR_DOWN_LEFT = 2; // Row 2: running 3/4 view
+    public static final int ANIM_DIR_UP = 0;
+    public static final int ANIM_DIR_UP_RIGHT = 1;
+    public static final int ANIM_DIR_RIGHT = 2;
+    public static final int ANIM_DIR_DOWN_RIGHT = 3;
+    public static final int ANIM_DIR_DOWN = 4;
+    public static final int ANIM_DIR_DOWN_LEFT = 5;
+    public static final int ANIM_DIR_LEFT = 6;
+    public static final int ANIM_DIR_UP_LEFT = 7;
     
     // Animations
     private Animation idleAnim;
-    private Animation runLeftAnim;       // LEFT - Row 0, no flip
-    private Animation runRightAnim;      // RIGHT - Row 0, flipped
-    private Animation runUpLeftAnim;     // UP+LEFT - Row 0, no flip
-    private Animation runUpRightAnim;    // UP+RIGHT - Row 0, flipped
-    private Animation runDownAnim;       // DOWN - Row 1, no flip
-    private Animation runDownLeftAnim;   // DOWN+LEFT - Row 2, no flip
-    private Animation runDownRightAnim;  // DOWN+RIGHT - Row 2, flipped
+    private Animation runUpAnim;         // UP - Row 0
+    private Animation runUpRightAnim;    // UP+RIGHT - Row 1
+    private Animation runRightAnim;      // RIGHT - Row 2
+    private Animation runDownRightAnim;  // DOWN+RIGHT - Row 3
+    private Animation runDownAnim;       // DOWN - Row 4
+    private Animation runDownLeftAnim;   // DOWN+LEFT - Row 5
+    private Animation runLeftAnim;       // LEFT - Row 6
+    private Animation runUpLeftAnim;     // UP+LEFT - Row 7
     private Animation currentAnimation;
     
     // Sound manager reference
@@ -99,7 +106,7 @@ public class PlayerSprite extends Sprite {
     // Load sprite animations using StripAnimation class.
     private void loadSpriteAnimations() {
         // Use StripAnimation to load sprite strip and get animations
-        Map<Integer, Animation> animations = StripAnimation.loadSpriteAnimations("images/playerRunningStrip.png", 80);
+        Map<Integer, Animation> animations = StripAnimation.loadSpriteAnimations("images/player/playerRunningStrip.png", RUN_FRAME_DURATION);
         
         if (animations == null || animations.isEmpty()) {
             System.out.println("Failed to load playerRunningStrip.png, falling back to player.png");
@@ -114,24 +121,25 @@ public class PlayerSprite extends Sprite {
         height = StripAnimation.FRAME_HEIGHT;
         
         // Get animations from the map
-        runLeftAnim = animations.get(0);      // Left - Row 0, no flip
-        runRightAnim = animations.get(1);     // Right - Row 0, flipped
-        runUpLeftAnim = animations.get(2);    // Up+Left - Row 0, no flip
-        runUpRightAnim = animations.get(3);   // Up+Right - Row 0, flipped
-        runDownAnim = animations.get(4);      // Down - Row 1, no flip
-        runDownLeftAnim = animations.get(5);  // Down+Left - Row 2, no flip
-        runDownRightAnim = animations.get(6); // Down+Right - Row 2, flipped
+        runUpAnim = animations.get(ANIM_DIR_UP);
+        runUpRightAnim = animations.get(ANIM_DIR_UP_RIGHT);
+        runRightAnim = animations.get(ANIM_DIR_RIGHT);
+        runDownRightAnim = animations.get(ANIM_DIR_DOWN_RIGHT);
+        runDownAnim = animations.get(ANIM_DIR_DOWN);
+        runDownLeftAnim = animations.get(ANIM_DIR_DOWN_LEFT);
+        runLeftAnim = animations.get(ANIM_DIR_LEFT);
+        runUpLeftAnim = animations.get(ANIM_DIR_UP_LEFT);
         
         idleAnim = new Animation(true);
-        if (runLeftAnim != null) {
-            // Get the first frame from runLeftAnim for idle
+        if (runDownAnim != null) {
+            // Use the first DOWN frame as the default idle pose.
             StripAnimation stripAnim = new StripAnimation();
-            BufferedImage spriteStrip = ImageManager.loadBufferedImage("images/playerRunningStrip.png");
+            BufferedImage spriteStrip = ImageManager.loadBufferedImage("images/player/playerRunningStrip.png");
             if (spriteStrip != null) {
-                BufferedImage[] row0Frames = stripAnim.extractFramesFromRow(spriteStrip, 0);
-                if (row0Frames.length > 0) {
-                    idleAnim.addFrame(row0Frames[0], 300);
-                    image = row0Frames[0];
+                BufferedImage[] downFrames = stripAnim.extractFramesFromRow(spriteStrip, ANIM_DIR_DOWN);
+                if (downFrames.length > 0) {
+                    idleAnim.addFrame(downFrames[0], 300);
+                    image = downFrames[0];
                 }
             }
         }
@@ -161,11 +169,13 @@ public class PlayerSprite extends Sprite {
                 break;
             case DIR_UP:
                 worldY = worldY - dy;
+                facingDirection = DIR_UP;
                 currentState = STATE_RUN;
-                animationToPlay = runRightAnim;
+                animationToPlay = runUpAnim;
                 break;
             case DIR_DOWN:
                 worldY = worldY + dy;
+                facingDirection = DIR_DOWN;
                 currentState = STATE_RUN;
                 animationToPlay = runDownAnim;
                 break;
@@ -240,6 +250,7 @@ public class PlayerSprite extends Sprite {
     }
     
     public void update() {
+        syncDimensionsWithCurrentFrame();
         if (currentAnimation != null) {
             currentAnimation.update();
         }
@@ -247,21 +258,25 @@ public class PlayerSprite extends Sprite {
     
     // Draws the player at screen position.
     public void draw(Graphics2D g2) {
-        // Get the current frame image and update dimensions to match
-        if (currentAnimation != null && currentAnimation.getImage() != null) {
-            Image currentFrame = currentAnimation.getImage();
-            width = currentFrame.getWidth(null);
-            height = currentFrame.getHeight(null);
+        syncDimensionsWithCurrentFrame();
+
+        BufferedImage currentFrame = getCurrentBufferedImage();
+        if (currentFrame != null) {
             g2.drawImage(currentFrame, screenX, screenY, width, height, null);
-        } else if (image != null) {
-            width = image.getWidth(null);
-            height = image.getHeight(null);
-            g2.drawImage(image, screenX, screenY, width, height, null);
         }
     }
     
     public Rectangle2D.Double getBoundingRectangle() {
+        syncDimensionsWithCurrentFrame();
         return new Rectangle2D.Double(worldX, worldY, width, height);
+    }
+
+    public BufferedImage getCurrentBufferedImage() {
+        if (currentAnimation != null && currentAnimation.getImage() != null) {
+            return PixelCollision.toBufferedImage(currentAnimation.getImage());
+        }
+
+        return PixelCollision.toBufferedImage(image);
     }
     
     public int getWorldX() {
@@ -312,5 +327,13 @@ public class PlayerSprite extends Sprite {
     
     public void setWorldY(int y) {
         worldY = y;
+    }
+
+    private void syncDimensionsWithCurrentFrame() {
+        BufferedImage currentFrame = getCurrentBufferedImage();
+        if (currentFrame != null) {
+            width = currentFrame.getWidth();
+            height = currentFrame.getHeight();
+        }
     }
 }
