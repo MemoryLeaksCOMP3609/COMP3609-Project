@@ -37,13 +37,27 @@ public enum PlayerUpgradeOption {
 
         @Override
         public boolean isAvailable(Player player) {
-            return player != null && player.getLevel() % 2 == 0;
+            if (player == null || player.getLevel() % 2 != 0) {
+                return false;
+            }
+
+            WeaponType weaponType = player.getWeaponType();
+            if (weaponType == WeaponType.FIRE_ARROW || weaponType == WeaponType.FIRE_SPELL) {
+                return player.getProjectileCountMultiplier() < 5.0;
+            }
+
+            return true;
         }
     },
     PROJECTILE_SIZE("Projectile Size +0.15x") {
         @Override
         public void apply(Player player) {
             player.increaseProjectileSizeMultiplier(0.15);
+        }
+
+        @Override
+        public boolean isAvailable(Player player) {
+            return player != null && player.getWeaponType() == WeaponType.FIRE_BALL;
         }
     };
 

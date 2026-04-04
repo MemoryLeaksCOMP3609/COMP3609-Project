@@ -1050,7 +1050,12 @@ public class GamePanel extends JPanel {
 
     private int getProjectileCount(Player playerData) {
         double multiplier = playerData != null ? playerData.getProjectileCountMultiplier() : 1.0;
-        return Math.max(1, (int) Math.round(multiplier));
+        int projectileCount = Math.max(1, (int) Math.round(multiplier));
+        WeaponType weaponType = playerData != null ? playerData.getWeaponType() : selectedWeapon;
+        if (weaponType == WeaponType.FIRE_ARROW || weaponType == WeaponType.FIRE_SPELL) {
+            return Math.min(5, projectileCount);
+        }
+        return projectileCount;
     }
 
     private double getProjectileScale(Player playerData, double baseScale) {
