@@ -1,5 +1,6 @@
 import java.awt.Graphics2D;
 import java.awt.Color;
+import java.awt.geom.AffineTransform;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 
@@ -30,6 +31,7 @@ public abstract class Enemy extends Sprite {
     protected long attackCooldownMs;
     protected double renderScale;
     protected long damageFlashRemainingMs;
+    protected boolean facingLeft;
 
     protected Enemy(String name, int maxHealth, int movementSpeed, int contactDamage,
                     int scoreValue, int experienceReward, int startX, int startY) {
@@ -49,6 +51,7 @@ public abstract class Enemy extends Sprite {
         this.attackCooldownMs = 0;
         this.renderScale = 1.0;
         this.damageFlashRemainingMs = 0;
+        this.facingLeft = true;
     }
 
     protected Animation loadStripAnimation(String imagePath, long frameDuration, boolean loop) {
@@ -135,6 +138,10 @@ public abstract class Enemy extends Sprite {
         double directionX = deltaX / distance;
         double directionY = deltaY / distance;
 
+        if (Math.abs(directionX) > 0.001) {
+            facingLeft = directionX < 0;
+        }
+
         worldX += (int) Math.round(directionX * moveDistance);
         worldY += (int) Math.round(directionY * moveDistance);
 
@@ -176,7 +183,17 @@ public abstract class Enemy extends Sprite {
             if (damageFlashRemainingMs > 0) {
                 frameToDraw = ImageManager.tintVisiblePixels(currentFrame, Color.RED, 0.45f);
             }
-            g2.drawImage(frameToDraw, screenX, screenY, width, height, null);
+            if (facingLeft) {
+                g2.drawImage(frameToDraw, screenX, screenY, width, height, null);
+            } else {
+                AffineTransform originalTransform = g2.getTransform();
+                AffineTransform flippedTransform = new AffineTransform();
+                flippedTransform.translate(screenX + width, screenY);
+                flippedTransform.scale(-1, 1);
+                g2.transform(flippedTransform);
+                g2.drawImage(frameToDraw, 0, 0, width, height, null);
+                g2.setTransform(originalTransform);
+            }
         }
     }
 
