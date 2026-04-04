@@ -21,10 +21,12 @@ public class PlayerSprite extends Sprite {
     private long speedBoostTimer = 0; // Time remaining in milliseconds
     private static final long SPEED_BOOST_DURATION = 1000; // 1 second
     private static final int SPEED_BOOST_MULTIPLIER = 3; // 3x speed
-    private static final long RUN_FRAME_DURATION = 40;
+    private static final long RUN_FRAME_DURATION = 28;
     private static final long DAMAGE_FLASH_DURATION_MS = 120;
     private int screenX;
     private int screenY;
+    private double preciseScreenX;
+    private double preciseScreenY;
     private long damageFlashRemainingMs;
     
     // Animation states
@@ -94,6 +96,8 @@ public class PlayerSprite extends Sprite {
         preciseWorldY = yPos;
         screenX = xPos;
         screenY = yPos;
+        preciseScreenX = xPos;
+        preciseScreenY = yPos;
         damageFlashRemainingMs = 0;
         width = 50;
         height = 50;
@@ -242,9 +246,10 @@ public class PlayerSprite extends Sprite {
      * Screen position = world position - camera position.
      */
     public void updateScreenPosition(int cameraX, int cameraY) {
-        // Calculate screen position based on camera offset
-        screenX = worldX - cameraX;
-        screenY = worldY - cameraY;
+        preciseScreenX = preciseWorldX - cameraX;
+        preciseScreenY = preciseWorldY - cameraY;
+        screenX = (int) Math.round(preciseScreenX);
+        screenY = (int) Math.round(preciseScreenY);
     }
     
     public void setIdle() {
@@ -259,11 +264,15 @@ public class PlayerSprite extends Sprite {
         soundManager.stopFootstep();
     }
     
-    public void update() {
+    public void update(long deltaTimeMs) {
         syncDimensionsWithCurrentFrame();
         if (currentAnimation != null) {
-            currentAnimation.update();
+            currentAnimation.update(deltaTimeMs);
         }
+    }
+
+    public void update() {
+        update(0);
     }
     
     // Draws the player at screen position.

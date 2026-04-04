@@ -104,11 +104,15 @@ public abstract class Enemy extends Sprite {
         }
     }
 
-    public void update() {
+    public void update(long deltaTimeMs) {
         if (currentAnimation != null) {
-            currentAnimation.update();
+            currentAnimation.update(deltaTimeMs);
             syncDimensionsWithCurrentFrame();
         }
+    }
+
+    public void update() {
+        update(0);
     }
 
     public void updateScreenPosition(int cameraX, int cameraY) {

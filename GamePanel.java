@@ -260,7 +260,7 @@ public class GamePanel extends JPanel {
             player.setIdle();
         }
 
-        player.update();
+        player.update(deltaTime);
         updatePlayerAutoFire(deltaTime, player, playerData);
         world.updateCamera(getWidth(), getHeight());
         world.updateScreenPositions();
@@ -285,6 +285,7 @@ public class GamePanel extends JPanel {
 
             enemy.updateDamageFlash(deltaTime);
             enemy.updateAttackCooldown(deltaTime);
+            enemy.update(deltaTime);
             double distanceToPlayer = getDistance(enemy.getCenterX(), enemy.getCenterY(), player.getCenterX(), player.getCenterY());
 
             if (enemy instanceof BatEnemy) {
