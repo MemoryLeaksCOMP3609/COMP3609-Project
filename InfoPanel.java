@@ -1,97 +1,89 @@
 import java.awt.*;
+import java.text.DecimalFormat;
 import javax.swing.*;
 
 /**
- * Information display panel showing FPS, player coordinates,
- * active effects, and collectibles count.
+ * Information display panel showing player stats and run state.
  */
 public class InfoPanel extends JPanel {
-    
-    private JLabel fpsLabel;
-    private JLabel positionLabel;
-    private JLabel effectsLabel;
-    private JLabel collectiblesLabel;
-    
-    private JTextField fpsTF;
-    private JTextField positionTF;
-    private JTextField effectsTF;
-    private JTextField collectiblesTF;
-    
+    private final JTextField healthTF;
+    private final JTextField levelTF;
+    private final JTextField experienceTF;
+    private final JTextField speedTF;
+    private final JTextField damageTF;
+    private final JTextField fireRateTF;
+    private final JTextField fpsTF;
+    private final JTextField effectsTF;
+
+    private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.00");
+
     public InfoPanel() {
-        setLayout(new GridLayout(2, 4));
+        setLayout(new GridLayout(2, 8));
         setPreferredSize(new Dimension(800, 60));
         setBackground(Color.DARK_GRAY);
-        
-        // Create labels
-        fpsLabel = new JLabel("FPS:");
-        positionLabel = new JLabel("Position:");
-        effectsLabel = new JLabel("Effect:");
-        collectiblesLabel = new JLabel("Collectibles:");
 
-        fpsLabel.setForeground(Color.WHITE);
-        positionLabel.setForeground(Color.WHITE);
-        effectsLabel.setForeground(Color.WHITE);
-        collectiblesLabel.setForeground(Color.WHITE);
+        addLabel("Health:");
+        healthTF = addField(Color.PINK, "100 / 100");
 
-        
-        // Create text fields
-        fpsTF = new JTextField(5);
-        positionTF = new JTextField(10);
-        effectsTF = new JTextField(10);
-        collectiblesTF = new JTextField(10);
+        addLabel("Level:");
+        levelTF = addField(Color.ORANGE, "1");
 
-        fpsTF.setForeground(Color.BLACK);
-        positionTF.setForeground(Color.BLACK);
-        effectsTF.setForeground(Color.BLACK);
-        collectiblesTF.setForeground(Color.BLACK);
+        addLabel("XP:");
+        experienceTF = addField(Color.CYAN, "0 / 100");
 
-        
-        // Make text fields non-editable
-        fpsTF.setEditable(false);
-        positionTF.setEditable(false);
-        effectsTF.setEditable(false);
-        collectiblesTF.setEditable(false);
-        
-        // Set colors
-        fpsTF.setBackground(Color.CYAN);
-        positionTF.setBackground(Color.YELLOW);
-        effectsTF.setBackground(Color.GREEN);
-        collectiblesTF.setBackground(Color.ORANGE);
-        
-        // Add to panel
-        add(fpsLabel);
-        add(fpsTF);
-        add(positionLabel);
-        add(positionTF);
-        add(effectsLabel);
-        add(effectsTF);
-        add(collectiblesLabel);
-        add(collectiblesTF);
-        
-        // Initialize values
-        fpsTF.setText("0");
-        positionTF.setText("(0, 0)");
-        effectsTF.setText("None");
-        collectiblesTF.setText("0 / 0");
+        addLabel("Speed:");
+        speedTF = addField(Color.YELLOW, "5");
+
+        addLabel("Damage:");
+        damageTF = addField(Color.GREEN, "1.00x");
+
+        addLabel("Fire Rate:");
+        fireRateTF = addField(new Color(180, 255, 180), "1.00x");
+
+        addLabel("FPS:");
+        fpsTF = addField(Color.LIGHT_GRAY, "0");
+
+        addLabel("Effect:");
+        effectsTF = addField(Color.WHITE, "None");
     }
-    
+
+    private void addLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setForeground(Color.WHITE);
+        add(label);
+    }
+
+    private JTextField addField(Color background, String initialValue) {
+        JTextField field = new JTextField(initialValue);
+        field.setEditable(false);
+        field.setForeground(Color.BLACK);
+        field.setBackground(background);
+        add(field);
+        return field;
+    }
+
+    public void updatePlayerStats(Player player) {
+        if (player == null) {
+            return;
+        }
+
+        healthTF.setText(player.getHealth() + " / " + player.getMaxHealth());
+        levelTF.setText(String.valueOf(player.getLevel()));
+        experienceTF.setText(player.getExperience() + " / " + player.getExperienceToNextLevel());
+        speedTF.setText(String.valueOf(player.getMoveSpeed()));
+        damageTF.setText(DECIMAL_FORMAT.format(player.getDamageMultiplier()) + "x");
+        fireRateTF.setText(DECIMAL_FORMAT.format(player.getFireRateMultiplier()) + "x");
+    }
+
     public void updateFPS(int fps) {
         fpsTF.setText(String.valueOf(fps));
     }
-    
-    public void updatePlayerPosition(int worldX, int worldY) {
-        positionTF.setText("(" + worldX + ", " + worldY + ")");
-    }
-    
+
     public void updateActiveEffects(String effectName) {
         if (effectName == null || effectName.isEmpty()) {
             effectsTF.setText("None");
         } else {
             effectsTF.setText(effectName);
         }
-    }
-    
-    public void updateCollectibles(int collected, int total) {
-        collectiblesTF.setText(collected + " / " + total);
     }
 }

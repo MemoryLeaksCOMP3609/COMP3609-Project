@@ -13,6 +13,7 @@ public class GamePanel extends JPanel {
     private static final int WORLD_WIDTH = 2500;
     private static final int WORLD_HEIGHT = 2500;
     private static final int WIN_COLLECTIBLES = 5;
+    private static final int EXPERIENCE_PER_COLLECTIBLE = 25;
     private static final long GOLDEN_TINT_DURATION = 1000;
     private static final int GOLDEN_TINT_COLOR = 0x80FFD700;
     private static final long GAME_OVER_EXIT_DELAY = 1500;
@@ -253,6 +254,7 @@ public class GamePanel extends JPanel {
 
     public void checkCollisions() {
         PlayerSprite player = world.getPlayer();
+        Player playerData = world.getPlayerData();
         if (player == null || !sessionState.isGameRunning() || sessionState.isGamePaused()) {
             return;
         }
@@ -270,6 +272,9 @@ public class GamePanel extends JPanel {
                 sessionState.setGoldenTintActive(true);
                 sessionState.setGoldenTintTimer(GOLDEN_TINT_DURATION);
                 sessionState.setActiveEffectName("Golden Tint");
+                if (playerData != null && playerData.gainExperience(EXPERIENCE_PER_COLLECTIBLE)) {
+                    sessionState.setActiveEffectName("Level Up");
+                }
 
                 if (sessionState.getCollectedCount() >= WIN_COLLECTIBLES) {
                     triggerGameOver(true);
@@ -366,12 +371,8 @@ public class GamePanel extends JPanel {
         }
 
         if (infoPanel != null) {
-            PlayerSprite player = world.getPlayer();
-            if (player != null) {
-                infoPanel.updatePlayerPosition(player.getWorldX(), player.getWorldY());
-            }
+            infoPanel.updatePlayerStats(world.getPlayerData());
             infoPanel.updateFPS(sessionState.getFps());
-            infoPanel.updateCollectibles(sessionState.getCollectedCount(), sessionState.getTotalCollectibles());
             infoPanel.updateActiveEffects(sessionState.getActiveEffectName());
         }
     }
@@ -522,6 +523,10 @@ public class GamePanel extends JPanel {
 
     public PlayerSprite getPlayer() {
         return world.getPlayer();
+    }
+
+    public Player getPlayerData() {
+        return world.getPlayerData();
     }
 
     public int getFPS() {

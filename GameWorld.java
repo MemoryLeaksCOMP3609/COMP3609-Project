@@ -7,6 +7,7 @@ public class GameWorld {
     private final WorldGenerator worldGenerator;
     private final BufferedImage backgroundImage;
 
+    private Player playerData;
     private PlayerSprite player;
     private ArrowSprite arrowSprite;
     private ArrayList<AnimatedSprite> animatedSprites;
@@ -31,7 +32,8 @@ public class GameWorld {
     public void initializeEntities(javax.swing.JPanel panel, int winCollectibles) {
         int playerStartX = worldWidth / 2 - 25;
         int playerStartY = worldHeight / 2 - 25;
-        player = new PlayerSprite(panel, playerStartX, playerStartY, worldWidth, worldHeight);
+        playerData = new Player();
+        player = new PlayerSprite(panel, playerData, playerStartX, playerStartY, worldWidth, worldHeight);
         solidObjects = worldGenerator.createSolidObjects(25, playerStartX, playerStartY, 250);
         collectibles = worldGenerator.createCollectibles(solidObjects, winCollectibles, 40, 200);
         animatedSprites = worldGenerator.createAnimatedSprites(panel);
@@ -77,6 +79,10 @@ public class GameWorld {
 
     public PlayerSprite getPlayer() {
         return player;
+    }
+
+    public Player getPlayerData() {
+        return playerData;
     }
 
     public ArrowSprite getArrowSprite() {

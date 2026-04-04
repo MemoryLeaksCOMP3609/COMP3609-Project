@@ -76,12 +76,8 @@ public class GameWindow extends JFrame
     }
     
     private void updateInfoPanel() {
-        PlayerSprite player = gamePanel.getPlayer();
-        if (player != null) {
-            infoPanel.updatePlayerPosition(player.getWorldX(), player.getWorldY());
-        }
+        infoPanel.updatePlayerStats(gamePanel.getPlayerData());
         infoPanel.updateFPS(gamePanel.getFPS());
-        infoPanel.updateCollectibles(gamePanel.getCollectedCount(), gamePanel.getTotalCollectibles());
         infoPanel.updateActiveEffects(gamePanel.getActiveEffectName());
     }
     

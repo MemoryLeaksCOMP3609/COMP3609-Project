@@ -9,12 +9,10 @@ import javax.swing.JPanel;
  * Player sprite with keyboard movement (arrow keys/WASD) and animation states
  */
 public class PlayerSprite extends Sprite {
+    private final Player playerData;
     
     private int worldX;
     private int worldY;
-    private int baseSpeed = 5; // Store the normal speed
-    private int dx = baseSpeed;
-    private int dy = baseSpeed;
     private boolean speedBoostActive = false;
     private long speedBoostTimer = 0; // Time remaining in milliseconds
     private static final long SPEED_BOOST_DURATION = 1000; // 1 second
@@ -80,8 +78,9 @@ public class PlayerSprite extends Sprite {
         return Math.max(min, Math.min(value, max));
     }
     
-    public PlayerSprite(JPanel p, int xPos, int yPos, int worldW, int worldH) {
+    public PlayerSprite(JPanel p, Player player, int xPos, int yPos, int worldW, int worldH) {
         super(p, xPos, yPos, 50, 50);
+        playerData = player;
         
         worldX = xPos;
         worldY = yPos;
@@ -156,53 +155,53 @@ public class PlayerSprite extends Sprite {
         
         switch (direction) {
             case DIR_LEFT:
-                worldX = worldX - dx;
+                worldX = worldX - getCurrentMoveSpeed();
                 facingDirection = DIR_LEFT;
                 currentState = STATE_RUN;
                 animationToPlay = runLeftAnim;
                 break;
             case DIR_RIGHT:
-                worldX = worldX + dx;
+                worldX = worldX + getCurrentMoveSpeed();
                 facingDirection = DIR_RIGHT;
                 currentState = STATE_RUN;
                 animationToPlay = runRightAnim;
                 break;
             case DIR_UP:
-                worldY = worldY - dy;
+                worldY = worldY - getCurrentMoveSpeed();
                 facingDirection = DIR_UP;
                 currentState = STATE_RUN;
                 animationToPlay = runUpAnim;
                 break;
             case DIR_DOWN:
-                worldY = worldY + dy;
+                worldY = worldY + getCurrentMoveSpeed();
                 facingDirection = DIR_DOWN;
                 currentState = STATE_RUN;
                 animationToPlay = runDownAnim;
                 break;
             case DIR_UP_LEFT:
-                worldX = worldX - dx;
-                worldY = worldY - dy;
+                worldX = worldX - getCurrentMoveSpeed();
+                worldY = worldY - getCurrentMoveSpeed();
                 facingDirection = DIR_UP_LEFT;
                 currentState = STATE_RUN;
                 animationToPlay = runUpLeftAnim;
                 break;
             case DIR_UP_RIGHT:
-                worldX = worldX + dx;
-                worldY = worldY - dy;
+                worldX = worldX + getCurrentMoveSpeed();
+                worldY = worldY - getCurrentMoveSpeed();
                 facingDirection = DIR_UP_RIGHT;
                 currentState = STATE_RUN;
                 animationToPlay = runUpRightAnim;
                 break;
             case DIR_DOWN_LEFT:
-                worldX = worldX - dx;
-                worldY = worldY + dy;
+                worldX = worldX - getCurrentMoveSpeed();
+                worldY = worldY + getCurrentMoveSpeed();
                 facingDirection = DIR_DOWN_LEFT;
                 currentState = STATE_RUN;
                 animationToPlay = runDownLeftAnim;
                 break;
             case DIR_DOWN_RIGHT:
-                worldX = worldX + dx;
-                worldY = worldY + dy;
+                worldX = worldX + getCurrentMoveSpeed();
+                worldY = worldY + getCurrentMoveSpeed();
                 facingDirection = DIR_DOWN_RIGHT;
                 currentState = STATE_RUN;
                 animationToPlay = runDownRightAnim;
@@ -302,8 +301,6 @@ public class PlayerSprite extends Sprite {
      * Multiple activations reset the timer.
      */
     public void activateSpeedBoost() {
-        dx = baseSpeed * SPEED_BOOST_MULTIPLIER;
-        dy = baseSpeed * SPEED_BOOST_MULTIPLIER;
         speedBoostActive = true;
         speedBoostTimer = SPEED_BOOST_DURATION;
     }
@@ -315,8 +312,6 @@ public class PlayerSprite extends Sprite {
                 // Speed boost expired, reset to base speed
                 speedBoostTimer = 0;
                 speedBoostActive = false;
-                dx = baseSpeed;
-                dy = baseSpeed;
             }
         }
     }
@@ -335,5 +330,17 @@ public class PlayerSprite extends Sprite {
             width = currentFrame.getWidth();
             height = currentFrame.getHeight();
         }
+    }
+
+    private int getCurrentMoveSpeed() {
+        int moveSpeed = playerData.getMoveSpeed();
+        if (speedBoostActive) {
+            return moveSpeed * SPEED_BOOST_MULTIPLIER;
+        }
+        return moveSpeed;
+    }
+
+    public Player getPlayerData() {
+        return playerData;
     }
 }
