@@ -24,6 +24,13 @@ public class GameInputState {
         return leftPressed || rightPressed || upPressed || downPressed;
     }
 
+    public void clearMovement() {
+        leftPressed = false;
+        rightPressed = false;
+        upPressed = false;
+        downPressed = false;
+    }
+
     public int resolveMovementDirection() {
         if (upPressed && leftPressed) {
             return PlayerSprite.DIR_UP_LEFT;

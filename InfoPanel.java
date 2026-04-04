@@ -12,13 +12,14 @@ public class InfoPanel extends JPanel {
     private final JTextField speedTF;
     private final JTextField damageTF;
     private final JTextField fireRateTF;
+    private final JTextField regenTF;
     private final JTextField fpsTF;
     private final JTextField effectsTF;
 
     private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.00");
 
     public InfoPanel() {
-        setLayout(new GridLayout(2, 8));
+        setLayout(new GridLayout(2, 9));
         setPreferredSize(new Dimension(800, 60));
         setBackground(Color.DARK_GRAY);
 
@@ -39,6 +40,9 @@ public class InfoPanel extends JPanel {
 
         addLabel("Fire Rate:");
         fireRateTF = addField(new Color(180, 255, 180), "1.00x");
+
+        addLabel("Regen:");
+        regenTF = addField(new Color(200, 255, 220), "1 / 5s");
 
         addLabel("FPS:");
         fpsTF = addField(Color.LIGHT_GRAY, "0");
@@ -69,10 +73,15 @@ public class InfoPanel extends JPanel {
 
         setFieldTextIfChanged(healthTF, player.getHealth() + " / " + player.getMaxHealth());
         setFieldTextIfChanged(levelTF, String.valueOf(player.getLevel()));
-        setFieldTextIfChanged(experienceTF, player.getExperience() + " / " + player.getExperienceToNextLevel());
+        if (player.isMaxLevel()) {
+            setFieldTextIfChanged(experienceTF, "MAX");
+        } else {
+            setFieldTextIfChanged(experienceTF, player.getExperience() + " / " + player.getExperienceToNextLevel());
+        }
         setFieldTextIfChanged(speedTF, String.valueOf(player.getMoveSpeed()));
         setFieldTextIfChanged(damageTF, DECIMAL_FORMAT.format(player.getDamageMultiplier()) + "x");
         setFieldTextIfChanged(fireRateTF, DECIMAL_FORMAT.format(player.getFireRateMultiplier()) + "x");
+        setFieldTextIfChanged(regenTF, player.getHealthRegenPerInterval() + " / 5s");
     }
 
     public void updateFPS(int fps) {

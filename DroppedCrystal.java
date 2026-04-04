@@ -12,7 +12,7 @@ public class DroppedCrystal {
         TIER_1(5),
         TIER_2(10),
         TIER_3(15),
-        TIER_4(25);
+        TIER_4(20);
 
         private final int experienceValue;
 

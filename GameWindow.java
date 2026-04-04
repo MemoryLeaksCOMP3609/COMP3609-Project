@@ -33,10 +33,12 @@ public class GameWindow extends JFrame
         mainPanel = new JPanel();
         mainPanel.setLayout(new BorderLayout());
         mainPanel.setBackground(Color.BLACK);
+        mainPanel.setFocusable(true);
         
         infoPanel = new InfoPanel();
         
         gamePanel = new GamePanel(infoPanel);
+        gamePanel.setFocusable(true);
         
         createButtonPanel();
         
@@ -47,6 +49,8 @@ public class GameWindow extends JFrame
         
         // Set up keyboard input
         mainPanel.addKeyListener(this);
+        gamePanel.addKeyListener(this);
+        addKeyListener(this);
         
         // Add main panel to window
         c = getContentPane();
@@ -56,6 +60,7 @@ public class GameWindow extends JFrame
         setResizable(true);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setVisible(true);
+        requestGameFocus();
     }
     
     private void createButtonPanel() {
@@ -89,7 +94,7 @@ public class GameWindow extends JFrame
             if (gamePanel.isGameOver()) {
                 WeaponType selectedWeapon = promptForWeaponChoice();
                 if (selectedWeapon == null) {
-                    mainPanel.requestFocus();
+                    requestGameFocus();
                     return;
                 }
                 gamePanel.setSelectedWeapon(selectedWeapon);
@@ -97,13 +102,13 @@ public class GameWindow extends JFrame
             } else if (!gamePanel.isGameRunning()) {
                 WeaponType selectedWeapon = promptForWeaponChoice();
                 if (selectedWeapon == null) {
-                    mainPanel.requestFocus();
+                    requestGameFocus();
                     return;
                 }
                 gamePanel.setSelectedWeapon(selectedWeapon);
                 gamePanel.startGame();
             }
-            mainPanel.requestFocus();
+            requestGameFocus();
         }
         
         if (command.equals(pauseB.getText())) {
@@ -113,14 +118,14 @@ public class GameWindow extends JFrame
             } else {
                 pauseB.setText("Pause");
             }
-            mainPanel.requestFocus();
+            requestGameFocus();
         }
         
         if (command.equals(exitB.getText())) {
             System.exit(0);
         }
         
-        mainPanel.requestFocus();
+        requestGameFocus();
     }
     
     @Override
@@ -189,5 +194,11 @@ public class GameWindow extends JFrame
         }
 
         return options[selectedIndex];
+    }
+
+    private void requestGameFocus() {
+        gamePanel.requestFocusInWindow();
+        mainPanel.requestFocusInWindow();
+        requestFocusInWindow();
     }
 }

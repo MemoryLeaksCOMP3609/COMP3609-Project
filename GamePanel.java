@@ -1,9 +1,12 @@
 import javax.swing.JPanel;
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 
 public class GamePanel extends JPanel {
@@ -68,6 +71,8 @@ public class GamePanel extends JPanel {
     private long totalDrawNanos;
     private int profiledUpdateCount;
     private int profiledDrawCount;
+    private int pendingLevelUpChoices;
+    private boolean levelUpDialogOpen;
 
     public GamePanel() {
         this(null);
@@ -115,6 +120,8 @@ public class GamePanel extends JPanel {
         totalDrawNanos = 0L;
         profiledUpdateCount = 0;
         profiledDrawCount = 0;
+        pendingLevelUpChoices = 0;
+        levelUpDialogOpen = false;
     }
 
     public void createGameEntities() {
@@ -149,6 +156,8 @@ public class GamePanel extends JPanel {
         totalDrawNanos = 0L;
         profiledUpdateCount = 0;
         profiledDrawCount = 0;
+        pendingLevelUpChoices = 0;
+        levelUpDialogOpen = false;
         sessionState.setFps(0);
         if (world.getPlayerData() != null) {
             world.getPlayerData().setWeaponType(selectedWeapon);
@@ -251,6 +260,8 @@ public class GamePanel extends JPanel {
             }
         }
 
+        processPendingLevelUpChoices();
+
         if (sessionState.isGameOver() && sessionState.getGameOverTime() > 0) {
             long elapsed = System.currentTimeMillis() - sessionState.getGameOverTime();
             if (elapsed >= GAME_OVER_EXIT_DELAY) {
@@ -304,6 +315,9 @@ public class GamePanel extends JPanel {
 
         player.updateSpeedBoost(deltaTime);
         player.updateDamageFlash(deltaTime);
+        if (playerData != null) {
+            playerData.updateRegeneration(deltaTime);
+        }
 
         if (sessionState.isGoldenTintActive()) {
             long remainingGoldenTint = sessionState.getGoldenTintTimer() - deltaTime;
@@ -447,9 +461,7 @@ public class GamePanel extends JPanel {
                 sessionState.setGoldenTintActive(true);
                 sessionState.setGoldenTintTimer(GOLDEN_TINT_DURATION);
                 sessionState.setActiveEffectName("Golden Tint");
-                if (playerData != null && playerData.gainExperience(EXPERIENCE_PER_COLLECTIBLE)) {
-                    sessionState.setActiveEffectName("Level Up");
-                }
+                queueLevelUpChoices(playerData != null ? playerData.gainExperience(EXPERIENCE_PER_COLLECTIBLE) : 0);
                 world.respawnCollectedCollectible(collectible);
                 sessionState.setTotalCollectibles(world.getCollectibles().size());
                 break;
@@ -463,9 +475,7 @@ public class GamePanel extends JPanel {
                 crystal.collect();
                 if (playerData != null) {
                     if (crystal.getType() == DroppedCrystal.CrystalType.EXPERIENCE) {
-                        if (playerData.gainExperience(crystal.getExperienceValue())) {
-                            sessionState.setActiveEffectName("Level Up");
-                        }
+                        queueLevelUpChoices(playerData.gainExperience(crystal.getExperienceValue()));
                     } else if (crystal.getType() == DroppedCrystal.CrystalType.HEALTH) {
                         playerData.heal(HEALTH_PER_CRYSTAL);
                         sessionState.setActiveEffectName("Health Crystal");
@@ -877,6 +887,97 @@ public class GamePanel extends JPanel {
         queuedBurstShots = 0;
         playerShotCooldownMs = 0;
         playerBurstCooldownMs = 0;
+    }
+
+    private void queueLevelUpChoices(int levelsGained) {
+        if (levelsGained <= 0) {
+            return;
+        }
+
+        pendingLevelUpChoices += levelsGained;
+        sessionState.setActiveEffectName("Level Up");
+    }
+
+    private void processPendingLevelUpChoices() {
+        if (pendingLevelUpChoices <= 0 || levelUpDialogOpen || !sessionState.isGameRunning() || sessionState.isGameOver()) {
+            return;
+        }
+
+        Player playerData = world.getPlayerData();
+        if (playerData == null) {
+            pendingLevelUpChoices = 0;
+            return;
+        }
+
+        levelUpDialogOpen = true;
+        boolean wasPaused = sessionState.isGamePaused();
+        sessionState.setGamePaused(true);
+        soundManager.stopClip("background");
+
+        try {
+            while (pendingLevelUpChoices > 0 && sessionState.isGameRunning() && !sessionState.isGameOver()) {
+                PlayerUpgradeOption selectedUpgrade = promptForLevelUpChoice(playerData);
+                if (selectedUpgrade == null) {
+                    continue;
+                }
+
+                selectedUpgrade.apply(playerData);
+                pendingLevelUpChoices--;
+                sessionState.setActiveEffectName(selectedUpgrade.getDisplayName());
+                if (infoPanel != null) {
+                    infoPanel.updatePlayerStats(playerData);
+                }
+            }
+        } finally {
+            levelUpDialogOpen = false;
+            inputState.clearMovement();
+            if (world.getPlayer() != null) {
+                world.getPlayer().setIdle();
+            }
+            sessionState.setGamePaused(wasPaused);
+            if (!sessionState.isGameOver() && sessionState.isGameRunning() && !sessionState.isGamePaused()) {
+                soundManager.playBackgroundMusic();
+            }
+            requestFocusInWindow();
+        }
+    }
+
+    private PlayerUpgradeOption promptForLevelUpChoice(Player playerData) {
+        ArrayList<PlayerUpgradeOption> choices = new ArrayList<PlayerUpgradeOption>();
+        for (PlayerUpgradeOption option : PlayerUpgradeOption.values()) {
+            if (option.isAvailable(playerData)) {
+                choices.add(option);
+            }
+        }
+        Collections.shuffle(choices);
+
+        int choiceCount = Math.min(3, choices.size());
+        String[] labels = new String[choiceCount];
+        for (int i = 0; i < choiceCount; i++) {
+            labels[i] = choices.get(i).getDisplayName();
+        }
+
+        String title = "Level Up";
+        String message = playerData.isMaxLevel()
+            ? "You reached the max level."
+            : "Level " + playerData.getLevel() + " - choose a stat to upgrade";
+
+        while (true) {
+            int selectedIndex = JOptionPane.showOptionDialog(
+                SwingUtilities.getWindowAncestor(this),
+                message,
+                title,
+                JOptionPane.DEFAULT_OPTION,
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                labels,
+                labels[0]
+            );
+
+            if (selectedIndex >= 0 && selectedIndex < choiceCount) {
+                return choices.get(selectedIndex);
+            }
+        }
     }
 
     private Enemy findNearestEnemyInRange(int fromX, int fromY, int range) {

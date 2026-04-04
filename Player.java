@@ -1,13 +1,17 @@
 public class Player {
+    public static final int MAX_LEVEL = 20;
+
     private static final int BASE_MAX_HEALTH = 100;
     private static final int BASE_MOVE_SPEED = 5;
     private static final double BASE_DAMAGE_MULTIPLIER = 1.0;
     private static final double BASE_FIRE_RATE_MULTIPLIER = 1.0;
     private static final double BASE_PROJECTILE_COUNT_MULTIPLIER = 1.0;
     private static final double BASE_PROJECTILE_SIZE_MULTIPLIER = 1.0;
+    private static final int BASE_HEALTH_REGEN_PER_INTERVAL = 1;
+    private static final long HEALTH_REGEN_INTERVAL_MS = 5000L;
     private static final int BASE_LEVEL = 1;
     private static final int BASE_EXPERIENCE_TO_NEXT_LEVEL = 100;
-    private static final int EXPERIENCE_STEP_PER_LEVEL = 25;
+    private static final double EXPERIENCE_GROWTH_RATE = 1.10;
 
     private int maxHealth;
     private int health;
@@ -16,10 +20,12 @@ public class Player {
     private double fireRateMultiplier;
     private double projectileCountMultiplier;
     private double projectileSizeMultiplier;
+    private int healthRegenPerInterval;
     private int experience;
     private int level;
     private int experienceToNextLevel;
     private WeaponType weaponType;
+    private long healthRegenAccumulatorMs;
 
     public Player() {
         maxHealth = BASE_MAX_HEALTH;
@@ -29,10 +35,12 @@ public class Player {
         fireRateMultiplier = BASE_FIRE_RATE_MULTIPLIER;
         projectileCountMultiplier = BASE_PROJECTILE_COUNT_MULTIPLIER;
         projectileSizeMultiplier = BASE_PROJECTILE_SIZE_MULTIPLIER;
+        healthRegenPerInterval = BASE_HEALTH_REGEN_PER_INTERVAL;
         experience = 0;
         level = BASE_LEVEL;
         experienceToNextLevel = BASE_EXPERIENCE_TO_NEXT_LEVEL;
         weaponType = WeaponType.FIRE_ARROW;
+        healthRegenAccumulatorMs = 0L;
     }
 
     public void heal(int amount) {
@@ -49,22 +57,33 @@ public class Player {
         health = Math.max(0, health - amount);
     }
 
-    public boolean gainExperience(int amount) {
-        if (amount <= 0) {
-            return false;
+    public int gainExperience(int amount) {
+        if (amount <= 0 || level >= MAX_LEVEL) {
+            if (level >= MAX_LEVEL) {
+                experience = 0;
+            }
+            return 0;
         }
 
         experience += amount;
-        boolean leveledUp = false;
+        int levelsGained = 0;
 
-        while (experience >= experienceToNextLevel) {
+        while (level < MAX_LEVEL && experience >= experienceToNextLevel) {
             experience -= experienceToNextLevel;
             level++;
-            experienceToNextLevel += EXPERIENCE_STEP_PER_LEVEL;
-            leveledUp = true;
+            levelsGained++;
+
+            if (level >= MAX_LEVEL) {
+                level = MAX_LEVEL;
+                experience = 0;
+                experienceToNextLevel = 0;
+                break;
+            }
+
+            experienceToNextLevel = (int) Math.ceil(experienceToNextLevel * EXPERIENCE_GROWTH_RATE);
         }
 
-        return leveledUp;
+        return levelsGained;
     }
 
     public void increaseMoveSpeed(int amount) {
@@ -104,6 +123,27 @@ public class Player {
         }
     }
 
+    public void increaseHealthRegenPerInterval(int amount) {
+        if (amount > 0) {
+            healthRegenPerInterval += amount;
+        }
+    }
+
+    public void updateRegeneration(long deltaTimeMs) {
+        if (deltaTimeMs <= 0 || health <= 0 || health >= maxHealth || healthRegenPerInterval <= 0) {
+            if (health >= maxHealth) {
+                healthRegenAccumulatorMs = 0L;
+            }
+            return;
+        }
+
+        healthRegenAccumulatorMs += deltaTimeMs;
+        while (healthRegenAccumulatorMs >= HEALTH_REGEN_INTERVAL_MS && health < maxHealth) {
+            heal(healthRegenPerInterval);
+            healthRegenAccumulatorMs -= HEALTH_REGEN_INTERVAL_MS;
+        }
+    }
+
     public int getMaxHealth() {
         return maxHealth;
     }
@@ -132,6 +172,10 @@ public class Player {
         return projectileSizeMultiplier;
     }
 
+    public int getHealthRegenPerInterval() {
+        return healthRegenPerInterval;
+    }
+
     public int getExperience() {
         return experience;
     }
@@ -142,6 +186,10 @@ public class Player {
 
     public int getExperienceToNextLevel() {
         return experienceToNextLevel;
+    }
+
+    public boolean isMaxLevel() {
+        return level >= MAX_LEVEL;
     }
 
     public WeaponType getWeaponType() {
