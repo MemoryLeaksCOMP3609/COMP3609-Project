@@ -28,6 +28,8 @@ public class PlayerSprite extends Sprite {
     private double preciseScreenX;
     private double preciseScreenY;
     private long damageFlashRemainingMs;
+    private BufferedImage cachedBaseFrame;
+    private BufferedImage cachedDamageFlashFrame;
     
     // Animation states
     public static final int STATE_IDLE = 0;
@@ -99,6 +101,8 @@ public class PlayerSprite extends Sprite {
         preciseScreenX = xPos;
         preciseScreenY = yPos;
         damageFlashRemainingMs = 0;
+        cachedBaseFrame = null;
+        cachedDamageFlashFrame = null;
         width = 50;
         height = 50;
         
@@ -283,7 +287,7 @@ public class PlayerSprite extends Sprite {
         if (currentFrame != null) {
             BufferedImage frameToDraw = currentFrame;
             if (damageFlashRemainingMs > 0) {
-                frameToDraw = ImageManager.tintVisiblePixels(currentFrame, Color.RED, 0.45f);
+                frameToDraw = getDamageFlashFrame(currentFrame);
             }
             g2.drawImage(frameToDraw, screenX, screenY, width, height, null);
         }
@@ -393,5 +397,22 @@ public class PlayerSprite extends Sprite {
 
     public void updateDamageFlash(long deltaTimeMs) {
         damageFlashRemainingMs = Math.max(0, damageFlashRemainingMs - deltaTimeMs);
+        if (damageFlashRemainingMs == 0) {
+            cachedBaseFrame = null;
+            cachedDamageFlashFrame = null;
+        }
+    }
+
+    private BufferedImage getDamageFlashFrame(BufferedImage currentFrame) {
+        if (currentFrame == null) {
+            return null;
+        }
+
+        if (currentFrame != cachedBaseFrame || cachedDamageFlashFrame == null) {
+            cachedBaseFrame = currentFrame;
+            cachedDamageFlashFrame = ImageManager.tintVisiblePixels(currentFrame, Color.RED, 0.45f);
+        }
+
+        return cachedDamageFlashFrame;
     }
 }

@@ -77,21 +77,28 @@ public class GameWorld {
 
         for (AnimatedSprite sprite : animatedSprites) {
             sprite.updateScreenPosition(cameraX, cameraY);
-            sprite.update();
         }
 
         for (Collectible collectible : collectibles) {
             collectible.updateScreenPosition(cameraX, cameraY);
-            collectible.update();
         }
 
         for (Enemy enemy : enemies) {
             enemy.updateScreenPosition(cameraX, cameraY);
-            enemy.update();
         }
 
         if (arrowSprite != null && player != null) {
             arrowSprite.update(player.getScreenX(), player.getScreenY(), collectibles);
+        }
+    }
+
+    public void updateWorldAnimations() {
+        for (AnimatedSprite sprite : animatedSprites) {
+            sprite.update();
+        }
+
+        for (Collectible collectible : collectibles) {
+            collectible.update();
         }
     }
 

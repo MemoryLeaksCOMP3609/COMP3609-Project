@@ -32,6 +32,8 @@ public abstract class Enemy extends Sprite {
     protected double renderScale;
     protected long damageFlashRemainingMs;
     protected boolean facingLeft;
+    protected BufferedImage cachedBaseFrame;
+    protected BufferedImage cachedDamageFlashFrame;
 
     protected Enemy(String name, int maxHealth, int movementSpeed, int contactDamage,
                     int scoreValue, int experienceReward, int startX, int startY) {
@@ -52,6 +54,8 @@ public abstract class Enemy extends Sprite {
         this.renderScale = 1.0;
         this.damageFlashRemainingMs = 0;
         this.facingLeft = true;
+        this.cachedBaseFrame = null;
+        this.cachedDamageFlashFrame = null;
     }
 
     protected Animation loadStripAnimation(String imagePath, long frameDuration, boolean loop) {
@@ -185,7 +189,7 @@ public abstract class Enemy extends Sprite {
         if (currentFrame != null) {
             BufferedImage frameToDraw = currentFrame;
             if (damageFlashRemainingMs > 0) {
-                frameToDraw = ImageManager.tintVisiblePixels(currentFrame, Color.RED, 0.45f);
+                frameToDraw = getDamageFlashFrame(currentFrame);
             }
             if (facingLeft) {
                 g2.drawImage(frameToDraw, screenX, screenY, width, height, null);
@@ -284,9 +288,26 @@ public abstract class Enemy extends Sprite {
 
     public void updateDamageFlash(long deltaTimeMs) {
         damageFlashRemainingMs = Math.max(0, damageFlashRemainingMs - deltaTimeMs);
+        if (damageFlashRemainingMs == 0) {
+            cachedBaseFrame = null;
+            cachedDamageFlashFrame = null;
+        }
     }
 
     protected void triggerDamageFlash() {
         damageFlashRemainingMs = DAMAGE_FLASH_DURATION_MS;
+    }
+
+    protected BufferedImage getDamageFlashFrame(BufferedImage currentFrame) {
+        if (currentFrame == null) {
+            return null;
+        }
+
+        if (currentFrame != cachedBaseFrame || cachedDamageFlashFrame == null) {
+            cachedBaseFrame = currentFrame;
+            cachedDamageFlashFrame = ImageManager.tintVisiblePixels(currentFrame, Color.RED, 0.45f);
+        }
+
+        return cachedDamageFlashFrame;
     }
 }

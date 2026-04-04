@@ -136,6 +136,7 @@ public class GamePanel extends JPanel {
                         updatePlayer(deltaTimeMs);
                         updateEnemies(deltaTimeMs);
                         updateProjectiles(deltaTimeMs);
+                        world.updateWorldAnimations();
                         world.updateScreenPositions();
                         checkCollisions();
                         updateEffects();
@@ -261,8 +262,6 @@ public class GamePanel extends JPanel {
         player.update(deltaTime);
         updatePlayerAutoFire(deltaTime, player, playerData);
         world.updateCamera(getWidth(), getHeight());
-        world.updateScreenPositions();
-        repaint();
     }
 
     private void updateEnemies(long deltaTime) {
@@ -360,7 +359,6 @@ public class GamePanel extends JPanel {
                 }
                 world.respawnCollectedCollectible(collectible);
                 sessionState.setTotalCollectibles(world.getCollectibles().size());
-                world.updateScreenPositions();
                 break;
             }
         }
@@ -537,7 +535,9 @@ public class GamePanel extends JPanel {
 
         g2.setColor(new Color(100, 100, 100));
         for (SolidObject solid : world.getSolidObjects()) {
-            solid.draw(g2, world.getCameraX(), world.getCameraY());
+            if (isVisibleOnScreen(solid.getBoundingRectangle())) {
+                solid.draw(g2, world.getCameraX(), world.getCameraY());
+            }
         }
 
         for (Collectible collectible : world.getCollectibles()) {
@@ -545,7 +545,9 @@ public class GamePanel extends JPanel {
         }
 
         for (Enemy enemy : world.getEnemies()) {
-            enemy.draw(g2);
+            if (isVisibleOnScreen(enemy.getBoundingRectangle())) {
+                enemy.draw(g2);
+            }
         }
 
         for (AnimatedSprite sprite : world.getAnimatedSprites()) {
@@ -561,7 +563,9 @@ public class GamePanel extends JPanel {
         }
 
         for (Projectile projectile : world.getProjectiles()) {
-            projectile.draw(g2, world.getCameraX(), world.getCameraY());
+            if (isVisibleOnScreen(projectile.getBounds())) {
+                projectile.draw(g2, world.getCameraX(), world.getCameraY());
+            }
         }
 
         for (ImageFX effect : effects) {
@@ -710,5 +714,19 @@ public class GamePanel extends JPanel {
         int deltaX = endX - startX;
         int deltaY = endY - startY;
         return Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    }
+
+    private boolean isVisibleOnScreen(Rectangle2D.Double worldBounds) {
+        if (worldBounds == null) {
+            return false;
+        }
+
+        Rectangle2D.Double viewport = new Rectangle2D.Double(
+            world.getCameraX(),
+            world.getCameraY(),
+            getWidth(),
+            getHeight()
+        );
+        return viewport.intersects(worldBounds);
     }
 }
