@@ -21,8 +21,6 @@ public class GamePanel extends JPanel {
     private static final int TARGET_FPS = 60;
     private static final int PLAYER_ATTACK_RANGE = 500;
     private static final int BAT_STOP_DISTANCE = 200;
-    private static final int PLAYER_BULLET_RADIUS = 6;
-    private static final int BAT_BULLET_RADIUS = 5;
     private static final double PLAYER_BULLET_SPEED = 12.0;
     private static final double BAT_BULLET_SPEED = 8.0;
     private static final int PLAYER_BASE_DAMAGE = 10;
@@ -295,8 +293,8 @@ public class GamePanel extends JPanel {
                     enemy.attack();
                     if (enemy.canAttack()) {
                         world.getProjectiles().add(createProjectile(enemy.getCenterX(), enemy.getCenterY(),
-                            player.getCenterX(), player.getCenterY(), BAT_BULLET_SPEED, BAT_BULLET_RADIUS,
-                            enemy.getContactDamage(), true, Color.ORANGE));
+                            player.getCenterX(), player.getCenterY(), BAT_BULLET_SPEED,
+                            enemy.getContactDamage(), true, "images/spells/waterArrow", 0.10));
                         enemy.setAttackCooldown(BAT_FIRE_INTERVAL_MS);
                     }
                 }
@@ -331,7 +329,7 @@ public class GamePanel extends JPanel {
 
         world.getProjectiles().add(createProjectile(player.getCenterX(), player.getCenterY(),
             nearestEnemy.getCenterX(), nearestEnemy.getCenterY(), PLAYER_BULLET_SPEED,
-            PLAYER_BULLET_RADIUS, damage, false, Color.CYAN));
+            damage, false, "images/spells/fireArrow", 0.20));
 
         double fireRateMultiplier = playerData != null ? playerData.getFireRateMultiplier() : 1.0;
         playerShotCooldownMs = Math.max(80L, (long) Math.round(PLAYER_BASE_FIRE_INTERVAL_MS / fireRateMultiplier));
@@ -692,8 +690,8 @@ public class GamePanel extends JPanel {
     }
 
     private Projectile createProjectile(int startX, int startY, int targetX, int targetY,
-                                        double speed, int radius, int damage,
-                                        boolean enemyOwned, Color color) {
+                                        double speed, int damage, boolean enemyOwned,
+                                        String frameDirectory, double renderScale) {
         double deltaX = targetX - startX;
         double deltaY = targetY - startY;
         double distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
@@ -703,7 +701,9 @@ public class GamePanel extends JPanel {
 
         double velocityX = (deltaX / distance) * speed;
         double velocityY = (deltaY / distance) * speed;
-        return new Projectile(startX, startY, velocityX, velocityY, radius, damage, enemyOwned, color);
+        double rotationRadians = Math.atan2(deltaY, deltaX);
+        return new Projectile(startX, startY, velocityX, velocityY, damage, enemyOwned,
+            frameDirectory, renderScale, true, rotationRadians);
     }
 
     private double getDistance(int startX, int startY, int endX, int endY) {

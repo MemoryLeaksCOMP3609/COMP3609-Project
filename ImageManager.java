@@ -122,6 +122,17 @@ public class ImageManager {
         return pngFiles;
     }
 
+    public static BufferedImage[] loadBufferedImagesFromDirectory(String directoryPath) {
+        List<File> imageFiles = listPngFilesRecursively(directoryPath);
+        BufferedImage[] images = new BufferedImage[imageFiles.size()];
+
+        for (int i = 0; i < imageFiles.size(); i++) {
+            images[i] = loadBufferedImage(imageFiles.get(i).getPath());
+        }
+
+        return images;
+    }
+
     private static void collectPngFiles(File file, List<File> pngFiles) {
         if (file == null || !file.exists()) {
             return;
