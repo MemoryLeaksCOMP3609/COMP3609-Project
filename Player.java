@@ -24,7 +24,7 @@ public class Player {
     private int experience;
     private int level;
     private int experienceToNextLevel;
-    private WeaponType weaponType;
+    private Weapon weapon;
     private long healthRegenAccumulatorMs;
 
     public Player() {
@@ -39,7 +39,7 @@ public class Player {
         experience = 0;
         level = BASE_LEVEL;
         experienceToNextLevel = BASE_EXPERIENCE_TO_NEXT_LEVEL;
-        weaponType = WeaponType.FIRE_ARROW;
+        weapon = WeaponFactory.create(WeaponType.FIRE_ARROW);
         healthRegenAccumulatorMs = 0L;
     }
 
@@ -193,12 +193,19 @@ public class Player {
     }
 
     public WeaponType getWeaponType() {
-        return weaponType;
+        return weapon != null ? weapon.getType() : WeaponType.FIRE_ARROW;
     }
 
     public void setWeaponType(WeaponType weaponType) {
         if (weaponType != null) {
-            this.weaponType = weaponType;
+            weapon = WeaponFactory.create(weaponType);
         }
+    }
+
+    public Weapon getWeapon() {
+        if (weapon == null) {
+            weapon = WeaponFactory.create(WeaponType.FIRE_ARROW);
+        }
+        return weapon;
     }
 }

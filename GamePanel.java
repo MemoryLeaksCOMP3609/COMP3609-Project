@@ -52,9 +52,6 @@ public class GamePanel extends JPanel {
     private SoundManager soundManager;
     private InfoPanel infoPanel;
     private Timer gameLoopTimer;
-    private long playerShotCooldownMs;
-    private long playerBurstCooldownMs;
-    private int queuedBurstShots;
     private WeaponType selectedWeapon;
     private long lastFrameTimeNanos;
     private long lastFpsSampleNanos;
@@ -101,9 +98,6 @@ public class GamePanel extends JPanel {
         }
 
         gameLoopTimer = null;
-        playerShotCooldownMs = 0;
-        playerBurstCooldownMs = 0;
-        queuedBurstShots = 0;
         selectedWeapon = WeaponType.FIRE_ARROW;
         lastFrameTimeNanos = System.nanoTime();
         lastFpsSampleNanos = System.nanoTime();
@@ -138,9 +132,6 @@ public class GamePanel extends JPanel {
         sessionState.resetForNewGame();
         screenGrayScaleFX = null;
         createGameEntities();
-        playerShotCooldownMs = 0;
-        playerBurstCooldownMs = 0;
-        queuedBurstShots = 0;
         lastFrameTimeNanos = System.nanoTime();
         lastFpsSampleNanos = System.nanoTime();
         lastHudUpdateNanos = System.nanoTime();
@@ -347,7 +338,7 @@ public class GamePanel extends JPanel {
         }
 
         player.update(deltaTime);
-        updatePlayerAutoFire(deltaTime, player, playerData);
+        updatePlayerWeapon(deltaTime, player, playerData);
         world.updateCamera(getWidth(), getHeight());
     }
 
@@ -403,42 +394,11 @@ public class GamePanel extends JPanel {
         }
     }
 
-    private void updatePlayerAutoFire(long deltaTime, PlayerSprite player, Player playerData) {
-        WeaponType weaponType = playerData != null ? playerData.getWeaponType() : selectedWeapon;
-        int projectileCount = getProjectileCount(playerData);
-        double projectileScale = getProjectileScale(playerData,
-            weaponType == WeaponType.FIRE_BALL ? FIRE_BALL_BASE_SCALE : 0.20);
-
-        if (weaponType == WeaponType.FIRE_BALL) {
-            syncOrbitingFireballs(player, projectileCount, projectileScale, playerData);
+    private void updatePlayerWeapon(long deltaTime, PlayerSprite player, Player playerData) {
+        if (playerData == null || playerData.getWeapon() == null) {
             return;
         }
-
-        playerShotCooldownMs = Math.max(0, playerShotCooldownMs - deltaTime);
-        playerBurstCooldownMs = Math.max(0, playerBurstCooldownMs - deltaTime);
-        Enemy nearestEnemy = findNearestEnemyInRange(player.getCenterX(), player.getCenterY(), PLAYER_ATTACK_RANGE);
-        if (nearestEnemy == null) {
-            return;
-        }
-
-        int damage = PLAYER_BASE_DAMAGE;
-        if (playerData != null) {
-            damage = (int) Math.round(PLAYER_BASE_DAMAGE * playerData.getDamageMultiplier());
-        }
-
-        if (playerShotCooldownMs <= 0 && queuedBurstShots <= 0) {
-            queuedBurstShots = projectileCount;
-            playerBurstCooldownMs = 0;
-            playerShotCooldownMs = getBasePlayerFireInterval(weaponType, playerData);
-        }
-
-        if (queuedBurstShots > 0 && playerBurstCooldownMs <= 0) {
-            firePlayerProjectile(weaponType, player, nearestEnemy, damage, projectileScale);
-            queuedBurstShots--;
-            if (queuedBurstShots > 0) {
-                playerBurstCooldownMs = PLAYER_BURST_SPACING_MS;
-            }
-        }
+        playerData.getWeapon().update(deltaTime, world, player, playerData);
     }
 
     public void checkCollisions() {
@@ -881,12 +841,9 @@ public class GamePanel extends JPanel {
 
         this.selectedWeapon = selectedWeapon;
         if (world.getPlayerData() != null) {
+            world.getPlayerData().getWeapon().onUnequipped(world);
             world.getPlayerData().setWeaponType(selectedWeapon);
         }
-        removeOrbitingFireballs();
-        queuedBurstShots = 0;
-        playerShotCooldownMs = 0;
-        playerBurstCooldownMs = 0;
     }
 
     private void queueLevelUpChoices(int levelsGained) {
@@ -980,25 +937,6 @@ public class GamePanel extends JPanel {
         }
     }
 
-    private Enemy findNearestEnemyInRange(int fromX, int fromY, int range) {
-        Enemy nearestEnemy = null;
-        double nearestDistance = Double.MAX_VALUE;
-
-        for (Enemy enemy : world.getEnemies()) {
-            if (enemy.isDead()) {
-                continue;
-            }
-
-            double distance = getDistance(fromX, fromY, enemy.getCenterX(), enemy.getCenterY());
-            if (distance <= range && distance < nearestDistance) {
-                nearestDistance = distance;
-                nearestEnemy = enemy;
-            }
-        }
-
-        return nearestEnemy;
-    }
-
     private Projectile createProjectile(int startX, int startY, int targetX, int targetY,
                                         double speed, int damage, boolean enemyOwned,
                                         String frameDirectory, double renderScale,
@@ -1040,118 +978,4 @@ public class GamePanel extends JPanel {
         return viewport.intersects(worldBounds);
     }
 
-    private long getBasePlayerFireInterval(WeaponType weaponType, Player playerData) {
-        long baseInterval = weaponType == WeaponType.FIRE_ARROW
-            ? FIRE_ARROW_BASE_FIRE_INTERVAL_MS
-            : FIRE_SPELL_BASE_FIRE_INTERVAL_MS;
-        double fireRateMultiplier = playerData != null ? playerData.getFireRateMultiplier() : 1.0;
-        return Math.max(80L, (long) Math.round(baseInterval / fireRateMultiplier));
-    }
-
-    private int getProjectileCount(Player playerData) {
-        double multiplier = playerData != null ? playerData.getProjectileCountMultiplier() : 1.0;
-        int projectileCount = Math.max(1, (int) Math.round(multiplier));
-        WeaponType weaponType = playerData != null ? playerData.getWeaponType() : selectedWeapon;
-        if (weaponType == WeaponType.FIRE_ARROW || weaponType == WeaponType.FIRE_SPELL) {
-            return Math.min(5, projectileCount);
-        }
-        return projectileCount;
-    }
-
-    private double getProjectileScale(Player playerData, double baseScale) {
-        double multiplier = playerData != null ? playerData.getProjectileSizeMultiplier() : 1.0;
-        return baseScale * multiplier;
-    }
-
-    private void firePlayerProjectile(WeaponType weaponType, PlayerSprite player, Enemy targetEnemy,
-                                      int damage, double renderScale) {
-        if (weaponType == WeaponType.FIRE_SPELL) {
-            Projectile spellProjectile = createProjectile(
-                player.getCenterX(),
-                player.getCenterY(),
-                targetEnemy.getCenterX(),
-                targetEnemy.getCenterY(),
-                FIRE_SPELL_SPEED,
-                damage,
-                false,
-                "images/spells/fireSpell",
-                renderScale,
-                WeaponType.FIRE_SPELL,
-                Projectile.MotionMode.HOMING
-            );
-            spellProjectile.configureHomingTurnRate(0.22);
-            world.getProjectiles().add(spellProjectile);
-            return;
-        }
-
-        world.getProjectiles().add(createProjectile(
-            player.getCenterX(),
-            player.getCenterY(),
-            targetEnemy.getCenterX(),
-            targetEnemy.getCenterY(),
-            FIRE_ARROW_SPEED,
-            damage,
-            false,
-            "images/spells/fireArrow",
-            renderScale,
-            WeaponType.FIRE_ARROW,
-            Projectile.MotionMode.STRAIGHT
-        ));
-    }
-
-    private void syncOrbitingFireballs(PlayerSprite player, int projectileCount, double renderScale, Player playerData) {
-        ArrayList<Projectile> orbitProjectiles = new ArrayList<Projectile>();
-        Iterator<Projectile> iterator = world.getProjectiles().iterator();
-        while (iterator.hasNext()) {
-            Projectile projectile = iterator.next();
-            if (projectile.getWeaponType() == WeaponType.FIRE_BALL && !projectile.isEnemyOwned()) {
-                orbitProjectiles.add(projectile);
-            }
-        }
-
-        if (orbitProjectiles.size() == projectileCount) {
-            return;
-        }
-
-        removeOrbitingFireballs();
-
-        int damage = PLAYER_BASE_DAMAGE;
-        if (playerData != null) {
-            damage = (int) Math.round(PLAYER_BASE_DAMAGE * playerData.getDamageMultiplier());
-        }
-
-        double fireRateMultiplier = playerData != null ? playerData.getFireRateMultiplier() : 1.0;
-        for (int i = 0; i < projectileCount; i++) {
-            double orbitAngle = (Math.PI * 2.0 * i) / projectileCount;
-            Projectile fireball = createProjectile(
-                player.getCenterX(),
-                player.getCenterY(),
-                player.getCenterX() + 1,
-                player.getCenterY(),
-                0,
-                damage,
-                false,
-                "images/spells/fireBall",
-                renderScale,
-                WeaponType.FIRE_BALL,
-                Projectile.MotionMode.ORBIT
-            );
-            fireball.configureOrbit(
-                FIRE_BALL_ORBIT_RADIUS,
-                orbitAngle,
-                FIRE_BALL_BASE_ANGULAR_SPEED * fireRateMultiplier
-            );
-            world.getProjectiles().add(fireball);
-        }
-    }
-
-    private void removeOrbitingFireballs() {
-        Iterator<Projectile> iterator = world.getProjectiles().iterator();
-        while (iterator.hasNext()) {
-            Projectile projectile = iterator.next();
-            if (projectile.getWeaponType() == WeaponType.FIRE_BALL && !projectile.isEnemyOwned()) {
-                iterator.remove();
-            }
-        }
-    }
 }
