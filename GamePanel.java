@@ -1,5 +1,5 @@
 import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.awt.geom.Rectangle2D;
@@ -45,12 +45,15 @@ public class GamePanel extends JPanel {
     private GrayScaleFX screenGrayScaleFX;
     private SoundManager soundManager;
     private InfoPanel infoPanel;
-    private Thread gameThread;
-    private volatile boolean gameThreadRunning;
+    private Timer gameLoopTimer;
     private long playerShotCooldownMs;
     private long playerBurstCooldownMs;
     private int queuedBurstShots;
     private WeaponType selectedWeapon;
+    private long lastFrameTimeNanos;
+    private long lastFpsSampleNanos;
+    private long lastHudUpdateNanos;
+    private int renderedFramesSinceSample;
 
     public GamePanel() {
         this(null);
@@ -78,12 +81,15 @@ public class GamePanel extends JPanel {
             System.out.println("Failed to load worldBackgroundSmall.png, using default dimensions");
         }
 
-        gameThread = null;
-        gameThreadRunning = false;
+        gameLoopTimer = null;
         playerShotCooldownMs = 0;
         playerBurstCooldownMs = 0;
         queuedBurstShots = 0;
         selectedWeapon = WeaponType.FIRE_ARROW;
+        lastFrameTimeNanos = System.nanoTime();
+        lastFpsSampleNanos = System.nanoTime();
+        lastHudUpdateNanos = System.nanoTime();
+        renderedFramesSinceSample = 0;
     }
 
     public void createGameEntities() {
@@ -103,6 +109,11 @@ public class GamePanel extends JPanel {
         playerShotCooldownMs = 0;
         playerBurstCooldownMs = 0;
         queuedBurstShots = 0;
+        lastFrameTimeNanos = System.nanoTime();
+        lastFpsSampleNanos = System.nanoTime();
+        lastHudUpdateNanos = System.nanoTime();
+        renderedFramesSinceSample = 0;
+        sessionState.setFps(0);
         if (world.getPlayerData() != null) {
             world.getPlayerData().setWeaponType(selectedWeapon);
         }
@@ -134,75 +145,46 @@ public class GamePanel extends JPanel {
     }
 
     private void startGameThread() {
-        if (gameThread != null && gameThread.isAlive()) {
+        if (gameLoopTimer != null && gameLoopTimer.isRunning()) {
             return;
         }
 
-        gameThreadRunning = true;
-        gameThread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                long frameStartedAt = System.nanoTime();
-                final long targetNanos = 1_000_000_000L / TARGET_FPS;
-
-                while (gameThreadRunning && !Thread.currentThread().isInterrupted()) {
-                    long currentTimeNanos = System.nanoTime();
-                    long elapsedNanos = currentTimeNanos - frameStartedAt;
-                    long deltaTimeMs = Math.max(1L, elapsedNanos / 1_000_000);
-
-                    if (sessionState.isGameRunning() && !sessionState.isGamePaused()) {
-                        updatePlayer(deltaTimeMs);
-                        updateEnemies(deltaTimeMs);
-                        updateProjectiles(deltaTimeMs);
-                        world.updateWorldAnimations();
-                        world.updateScreenPositions();
-                        checkCollisions();
-                        updateEffects();
-                        updateFPSFromGameThread();
-
-                        SwingUtilities.invokeLater(new Runnable() {
-                            @Override
-                            public void run() {
-                                repaint();
-                            }
-                        });
-                    }
-
-                    if (sessionState.isGameOver() && sessionState.getGameOverTime() > 0) {
-                        long elapsed = System.currentTimeMillis() - sessionState.getGameOverTime();
-                        if (elapsed >= GAME_OVER_EXIT_DELAY) {
-                            System.exit(0);
-                        }
-                    }
-
-                    frameStartedAt = currentTimeNanos;
-                    long sleepTimeNanos = targetNanos - (System.nanoTime() - currentTimeNanos);
-                    if (sleepTimeNanos > 0) {
-                        try {
-                            Thread.sleep(sleepTimeNanos / 1_000_000, (int) (sleepTimeNanos % 1_000_000));
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            break;
-                        }
-                    }
-                }
-            }
-        });
-        gameThread.setName("GameLoopThread");
-        gameThread.setPriority(Thread.MAX_PRIORITY);
-        gameThread.start();
+        final int frameDelayMs = Math.max(1, (int) Math.round(1000.0 / TARGET_FPS));
+        lastFrameTimeNanos = System.nanoTime();
+        gameLoopTimer = new Timer(frameDelayMs, event -> onGameTick());
+        gameLoopTimer.setCoalesce(true);
+        gameLoopTimer.start();
     }
 
     private void stopGameThread() {
-        gameThreadRunning = false;
-        if (gameThread != null) {
-            gameThread.interrupt();
-            try {
-                gameThread.join(100);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+        if (gameLoopTimer != null) {
+            gameLoopTimer.stop();
+            gameLoopTimer = null;
+        }
+    }
+
+    private void onGameTick() {
+        long currentTimeNanos = System.nanoTime();
+        long elapsedNanos = currentTimeNanos - lastFrameTimeNanos;
+        lastFrameTimeNanos = currentTimeNanos;
+        long deltaTimeMs = Math.max(1L, Math.round(elapsedNanos / 1_000_000.0));
+
+        if (sessionState.isGameRunning() && !sessionState.isGamePaused()) {
+            updatePlayer(deltaTimeMs);
+            updateEnemies(deltaTimeMs);
+            updateProjectiles(deltaTimeMs);
+            world.updateWorldAnimations();
+            world.updateScreenPositions();
+            checkCollisions();
+            updateEffects();
+            repaint();
+        }
+
+        if (sessionState.isGameOver() && sessionState.getGameOverTime() > 0) {
+            long elapsed = System.currentTimeMillis() - sessionState.getGameOverTime();
+            if (elapsed >= GAME_OVER_EXIT_DELAY) {
+                System.exit(0);
             }
-            gameThread = null;
         }
     }
 
@@ -553,10 +535,12 @@ public class GamePanel extends JPanel {
             screenGrayScaleFX.update();
         }
 
-        if (infoPanel != null) {
+        long now = System.nanoTime();
+        if (infoPanel != null && now - lastHudUpdateNanos >= 100_000_000L) {
             infoPanel.updatePlayerStats(world.getPlayerData());
             infoPanel.updateFPS(sessionState.getFps());
             infoPanel.updateActiveEffects(sessionState.getActiveEffectName());
+            lastHudUpdateNanos = now;
         }
     }
 
@@ -578,6 +562,8 @@ public class GamePanel extends JPanel {
         } else {
             drawToBuffer((Graphics2D) g);
         }
+
+        updateRenderedFps();
     }
 
     private void drawToBuffer(Graphics2D g2) {
@@ -690,8 +676,16 @@ public class GamePanel extends JPanel {
         }
     }
 
-    private void updateFPSFromGameThread() {
-        sessionState.setFps(TARGET_FPS);
+    private void updateRenderedFps() {
+        renderedFramesSinceSample++;
+        long now = System.nanoTime();
+        long elapsedNanos = now - lastFpsSampleNanos;
+        if (elapsedNanos >= 1_000_000_000L) {
+            int fps = (int) Math.round(renderedFramesSinceSample * (1_000_000_000.0 / elapsedNanos));
+            sessionState.setFps(fps);
+            renderedFramesSinceSample = 0;
+            lastFpsSampleNanos = now;
+        }
     }
 
     public void setLeftKeyPressed(boolean pressed) {

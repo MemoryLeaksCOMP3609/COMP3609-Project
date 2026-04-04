@@ -67,23 +67,29 @@ public class InfoPanel extends JPanel {
             return;
         }
 
-        healthTF.setText(player.getHealth() + " / " + player.getMaxHealth());
-        levelTF.setText(String.valueOf(player.getLevel()));
-        experienceTF.setText(player.getExperience() + " / " + player.getExperienceToNextLevel());
-        speedTF.setText(String.valueOf(player.getMoveSpeed()));
-        damageTF.setText(DECIMAL_FORMAT.format(player.getDamageMultiplier()) + "x");
-        fireRateTF.setText(DECIMAL_FORMAT.format(player.getFireRateMultiplier()) + "x");
+        setFieldTextIfChanged(healthTF, player.getHealth() + " / " + player.getMaxHealth());
+        setFieldTextIfChanged(levelTF, String.valueOf(player.getLevel()));
+        setFieldTextIfChanged(experienceTF, player.getExperience() + " / " + player.getExperienceToNextLevel());
+        setFieldTextIfChanged(speedTF, String.valueOf(player.getMoveSpeed()));
+        setFieldTextIfChanged(damageTF, DECIMAL_FORMAT.format(player.getDamageMultiplier()) + "x");
+        setFieldTextIfChanged(fireRateTF, DECIMAL_FORMAT.format(player.getFireRateMultiplier()) + "x");
     }
 
     public void updateFPS(int fps) {
-        fpsTF.setText(String.valueOf(fps));
+        setFieldTextIfChanged(fpsTF, String.valueOf(fps));
     }
 
     public void updateActiveEffects(String effectName) {
         if (effectName == null || effectName.isEmpty()) {
-            effectsTF.setText("None");
+            setFieldTextIfChanged(effectsTF, "None");
         } else {
-            effectsTF.setText(effectName);
+            setFieldTextIfChanged(effectsTF, effectName);
+        }
+    }
+
+    private void setFieldTextIfChanged(JTextField field, String value) {
+        if (!value.equals(field.getText())) {
+            field.setText(value);
         }
     }
 }

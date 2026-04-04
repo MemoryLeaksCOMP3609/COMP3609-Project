@@ -21,7 +21,7 @@ public class StripAnimation {
     private int framesPerRow;
     
     // Animation speed control (in milliseconds per frame)
-    private long animationSpeed = 40;
+    private long animationSpeed = 200;
     
     // Default constructor using default frame dimensions.
     public StripAnimation() {

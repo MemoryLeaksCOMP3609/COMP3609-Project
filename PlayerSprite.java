@@ -1,6 +1,5 @@
-import java.awt.Graphics2D;
-import java.awt.Image;
 import java.awt.Color;
+import java.awt.Graphics2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.Map;
@@ -21,7 +20,7 @@ public class PlayerSprite extends Sprite {
     private long speedBoostTimer = 0; // Time remaining in milliseconds
     private static final long SPEED_BOOST_DURATION = 1000; // 1 second
     private static final int SPEED_BOOST_MULTIPLIER = 3; // 3x speed
-    private static final long RUN_FRAME_DURATION = 28;
+    private static final long RUN_FRAME_DURATION = 200;
     private static final long DAMAGE_FLASH_DURATION_MS = 120;
     private int screenX;
     private int screenY;
