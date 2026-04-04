@@ -3,6 +3,8 @@ public class Player {
     private static final int BASE_MOVE_SPEED = 5;
     private static final double BASE_DAMAGE_MULTIPLIER = 1.0;
     private static final double BASE_FIRE_RATE_MULTIPLIER = 1.0;
+    private static final double BASE_PROJECTILE_COUNT_MULTIPLIER = 1.0;
+    private static final double BASE_PROJECTILE_SIZE_MULTIPLIER = 1.0;
     private static final int BASE_LEVEL = 1;
     private static final int BASE_EXPERIENCE_TO_NEXT_LEVEL = 100;
     private static final int EXPERIENCE_STEP_PER_LEVEL = 25;
@@ -12,9 +14,12 @@ public class Player {
     private int moveSpeed;
     private double damageMultiplier;
     private double fireRateMultiplier;
+    private double projectileCountMultiplier;
+    private double projectileSizeMultiplier;
     private int experience;
     private int level;
     private int experienceToNextLevel;
+    private WeaponType weaponType;
 
     public Player() {
         maxHealth = BASE_MAX_HEALTH;
@@ -22,9 +27,12 @@ public class Player {
         moveSpeed = BASE_MOVE_SPEED;
         damageMultiplier = BASE_DAMAGE_MULTIPLIER;
         fireRateMultiplier = BASE_FIRE_RATE_MULTIPLIER;
+        projectileCountMultiplier = BASE_PROJECTILE_COUNT_MULTIPLIER;
+        projectileSizeMultiplier = BASE_PROJECTILE_SIZE_MULTIPLIER;
         experience = 0;
         level = BASE_LEVEL;
         experienceToNextLevel = BASE_EXPERIENCE_TO_NEXT_LEVEL;
+        weaponType = WeaponType.FIRE_ARROW;
     }
 
     public void heal(int amount) {
@@ -84,6 +92,18 @@ public class Player {
         }
     }
 
+    public void increaseProjectileCountMultiplier(double amount) {
+        if (amount > 0) {
+            projectileCountMultiplier += amount;
+        }
+    }
+
+    public void increaseProjectileSizeMultiplier(double amount) {
+        if (amount > 0) {
+            projectileSizeMultiplier += amount;
+        }
+    }
+
     public int getMaxHealth() {
         return maxHealth;
     }
@@ -104,6 +124,14 @@ public class Player {
         return fireRateMultiplier;
     }
 
+    public double getProjectileCountMultiplier() {
+        return projectileCountMultiplier;
+    }
+
+    public double getProjectileSizeMultiplier() {
+        return projectileSizeMultiplier;
+    }
+
     public int getExperience() {
         return experience;
     }
@@ -114,5 +142,15 @@ public class Player {
 
     public int getExperienceToNextLevel() {
         return experienceToNextLevel;
+    }
+
+    public WeaponType getWeaponType() {
+        return weaponType;
+    }
+
+    public void setWeaponType(WeaponType weaponType) {
+        if (weaponType != null) {
+            this.weaponType = weaponType;
+        }
     }
 }

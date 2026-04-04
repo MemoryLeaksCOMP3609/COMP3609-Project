@@ -87,8 +87,20 @@ public class GameWindow extends JFrame
         
         if (command.equals(startB.getText())) {
             if (gamePanel.isGameOver()) {
+                WeaponType selectedWeapon = promptForWeaponChoice();
+                if (selectedWeapon == null) {
+                    mainPanel.requestFocus();
+                    return;
+                }
+                gamePanel.setSelectedWeapon(selectedWeapon);
                 gamePanel.resetGame();
             } else if (!gamePanel.isGameRunning()) {
+                WeaponType selectedWeapon = promptForWeaponChoice();
+                if (selectedWeapon == null) {
+                    mainPanel.requestFocus();
+                    return;
+                }
+                gamePanel.setSelectedWeapon(selectedWeapon);
                 gamePanel.startGame();
             }
             mainPanel.requestFocus();
@@ -152,5 +164,30 @@ public class GameWindow extends JFrame
     @Override
     public void keyTyped(KeyEvent e) {
         // Not used
+    }
+
+    private WeaponType promptForWeaponChoice() {
+        WeaponType[] options = WeaponType.values();
+        String[] labels = new String[options.length];
+        for (int i = 0; i < options.length; i++) {
+            labels[i] = options[i].getDisplayName();
+        }
+
+        int selectedIndex = JOptionPane.showOptionDialog(
+            this,
+            "Choose your starting weapon",
+            "Weapon Select",
+            JOptionPane.DEFAULT_OPTION,
+            JOptionPane.PLAIN_MESSAGE,
+            null,
+            labels,
+            labels[0]
+        );
+
+        if (selectedIndex < 0 || selectedIndex >= options.length) {
+            return null;
+        }
+
+        return options[selectedIndex];
     }
 }
