@@ -3,6 +3,9 @@ import java.awt.Image;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
 
@@ -73,46 +76,64 @@ public class ImageManager {
         return scaleImage(src, targetWidth, newHeight);
     }
     
+    private static List<File> listPngFilesRecursively(String directoryPath) {
+        List<File> pngFiles = new ArrayList<>();
+        File directory = new File(directoryPath);
+        collectPngFiles(directory, pngFiles);
+        pngFiles.sort((left, right) -> left.getPath().compareToIgnoreCase(right.getPath()));
+        return pngFiles;
+    }
+
+    private static void collectPngFiles(File file, List<File> pngFiles) {
+        if (file == null || !file.exists()) {
+            return;
+        }
+
+        if (file.isFile()) {
+            if (file.getName().toLowerCase().endsWith(".png")) {
+                pngFiles.add(file);
+            }
+            return;
+        }
+
+        File[] children = file.listFiles();
+        if (children == null) {
+            return;
+        }
+
+        Arrays.sort(children, (left, right) -> left.getPath().compareToIgnoreCase(right.getPath()));
+        for (File child : children) {
+            collectPngFiles(child, pngFiles);
+        }
+    }
+
     // Load and scale tree images to max height.
     public static BufferedImage[] loadTreeImages(int targetHeight) {
-        BufferedImage[] trees = new BufferedImage[6];
-        BufferedImage[] originals = new BufferedImage[6];
-        originals[0] = loadBufferedImage("images/trees/Tree1.png");
-        originals[1] = loadBufferedImage("images/trees/Tree2.png");
-        originals[2] = loadBufferedImage("images/trees/Tree3.png");
-        originals[3] = loadBufferedImage("images/trees/Tree4.png");
-        originals[4] = loadBufferedImage("images/trees/Tree5.png");
-        originals[5] = loadBufferedImage("images/trees/Tree6.png");
-        
-        for (int i = 0; i < originals.length; i++) {
-            if (originals[i] != null) {
-                trees[i] = scaleImageToHeight(originals[i], targetHeight);
+        List<File> treeFiles = listPngFilesRecursively("images/objects/trees");
+        BufferedImage[] trees = new BufferedImage[treeFiles.size()];
+
+        for (int i = 0; i < treeFiles.size(); i++) {
+            BufferedImage original = loadBufferedImage(treeFiles.get(i).getPath());
+            if (original != null) {
+                trees[i] = scaleImageToHeight(original, targetHeight);
             }
         }
-        
+
         return trees;
     }
     
     // Load and scale rock images to max width.
     public static BufferedImage[] loadRockImages(int targetWidth) {
-        BufferedImage[] rocks = new BufferedImage[9];
-        BufferedImage[] originals = new BufferedImage[9];
-        originals[0] = loadBufferedImage("images/rocks/Rock1.png");
-        originals[1] = loadBufferedImage("images/rocks/Rock2.png");
-        originals[2] = loadBufferedImage("images/rocks/Rock3.png");
-        originals[3] = loadBufferedImage("images/rocks/Rock4.png");
-        originals[4] = loadBufferedImage("images/rocks/Rock5.png");
-        originals[5] = loadBufferedImage("images/rocks/Rock6.png");
-        originals[6] = loadBufferedImage("images/rocks/Rock7.png");
-        originals[7] = loadBufferedImage("images/rocks/Rock8.png");
-        originals[8] = loadBufferedImage("images/rocks/Rock9.png");
-        
-        for (int i = 0; i < originals.length; i++) {
-            if (originals[i] != null) {
-                rocks[i] = scaleImageToWidth(originals[i], targetWidth);
+        List<File> rockFiles = listPngFilesRecursively("images/objects/rocks");
+        BufferedImage[] rocks = new BufferedImage[rockFiles.size()];
+
+        for (int i = 0; i < rockFiles.size(); i++) {
+            BufferedImage original = loadBufferedImage(rockFiles.get(i).getPath());
+            if (original != null) {
+                rocks[i] = scaleImageToWidth(original, targetWidth);
             }
         }
-        
+
         return rocks;
     }
     
