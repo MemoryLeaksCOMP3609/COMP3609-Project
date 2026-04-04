@@ -243,7 +243,6 @@ temp/
 # *.sh
 
 # Documentation that shouldn't be tracked (if auto-generated)
-*.pdf
 *.doc
 *.docx
 *.txt
