@@ -113,6 +113,13 @@ public class ImageManager {
         int newHeight = (int) (src.getHeight() * ((double) targetWidth / src.getWidth()));
         return scaleImage(src, targetWidth, newHeight);
     }
+
+    public static BufferedImage scaleImageByFactor(BufferedImage src, double scaleFactor) {
+        if (src == null) return null;
+        int newWidth = Math.max(1, (int) Math.round(src.getWidth() * scaleFactor));
+        int newHeight = Math.max(1, (int) Math.round(src.getHeight() * scaleFactor));
+        return scaleImage(src, newWidth, newHeight);
+    }
     
     private static List<File> listPngFilesRecursively(String directoryPath) {
         List<File> pngFiles = new ArrayList<>();

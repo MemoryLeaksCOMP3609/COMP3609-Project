@@ -10,6 +10,7 @@ import java.util.Map;
 public class Projectile {
     private static final double MOVEMENT_REFERENCE_FRAME_MS = 40.0;
     private static final long DEFAULT_FRAME_DURATION_MS = 50;
+    private static final long IMPACT_LINGER_MS = 120;
     private static final Map<String, BufferedImage[]> FRAME_CACHE = new HashMap<String, BufferedImage[]>();
 
     private double worldX;
@@ -25,8 +26,10 @@ public class Projectile {
     private final double hitboxLengthScale;
     private final double hitboxThicknessScale;
     private long animationElapsedMs;
+    private long impactLingerRemainingMs;
     private int currentFrameIndex;
     private boolean active;
+    private boolean impacted;
 
     public Projectile(double worldX, double worldY, double velocityX, double velocityY,
                       int damage, boolean enemyOwned, String frameDirectory,
@@ -45,14 +48,24 @@ public class Projectile {
         this.hitboxLengthScale = hitboxLengthScale;
         this.hitboxThicknessScale = hitboxThicknessScale;
         this.animationElapsedMs = 0;
+        this.impactLingerRemainingMs = 0;
         this.currentFrameIndex = 0;
         this.active = true;
+        this.impacted = false;
     }
 
     public void update(long deltaTimeMs) {
-        double distanceScale = deltaTimeMs / MOVEMENT_REFERENCE_FRAME_MS;
-        worldX += velocityX * distanceScale;
-        worldY += velocityY * distanceScale;
+        if (impacted) {
+            impactLingerRemainingMs = Math.max(0, impactLingerRemainingMs - deltaTimeMs);
+            if (impactLingerRemainingMs == 0) {
+                active = false;
+            }
+        } else {
+            double distanceScale = deltaTimeMs / MOVEMENT_REFERENCE_FRAME_MS;
+            worldX += velocityX * distanceScale;
+            worldY += velocityY * distanceScale;
+        }
+
         if (frames.length > 1) {
             animationElapsedMs += deltaTimeMs;
             currentFrameIndex = (int) ((animationElapsedMs / DEFAULT_FRAME_DURATION_MS) % frames.length);
@@ -137,6 +150,15 @@ public class Projectile {
 
     public void deactivate() {
         active = false;
+    }
+
+    public void markImpact() {
+        impacted = true;
+        impactLingerRemainingMs = IMPACT_LINGER_MS;
+    }
+
+    public boolean hasImpacted() {
+        return impacted;
     }
 
     private static BufferedImage[] loadFrames(String frameDirectory) {

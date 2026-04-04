@@ -15,6 +15,7 @@ public class GamePanel extends JPanel {
     private static final int WORLD_HEIGHT = 2500;
     private static final int TOTAL_COLLECTIBLES = 11;
     private static final int EXPERIENCE_PER_COLLECTIBLE = 25;
+    private static final int HEALTH_PER_CRYSTAL = 20;
     private static final long GOLDEN_TINT_DURATION = 1000;
     private static final int GOLDEN_TINT_COLOR = 0x80FFD700;
     private static final long GAME_OVER_EXIT_DELAY = 1500;
@@ -363,6 +364,25 @@ public class GamePanel extends JPanel {
             }
         }
 
+        Iterator<DroppedCrystal> crystalIterator = world.getDroppedCrystals().iterator();
+        while (crystalIterator.hasNext()) {
+            DroppedCrystal crystal = crystalIterator.next();
+            if (!crystal.isCollected() && playerBounds.intersects(crystal.getBoundingRectangle())) {
+                crystal.collect();
+                if (playerData != null) {
+                    if (crystal.getType() == DroppedCrystal.CrystalType.EXPERIENCE) {
+                        if (playerData.gainExperience(crystal.getExperienceValue())) {
+                            sessionState.setActiveEffectName("Level Up");
+                        }
+                    } else if (crystal.getType() == DroppedCrystal.CrystalType.HEALTH) {
+                        playerData.heal(HEALTH_PER_CRYSTAL);
+                        sessionState.setActiveEffectName("Health Crystal");
+                    }
+                }
+                crystalIterator.remove();
+            }
+        }
+
         handleProjectileCollisions(player, playerData);
     }
 
@@ -371,6 +391,9 @@ public class GamePanel extends JPanel {
         while (projectileIterator.hasNext()) {
             Projectile projectile = projectileIterator.next();
             if (projectile.isEnemyOwned()) {
+                if (projectile.hasImpacted()) {
+                    continue;
+                }
                 if (projectile.intersects(player.getBoundingRectangle())) {
                     if (playerData != null) {
                         playerData.takeDamage(projectile.getDamage());
@@ -379,16 +402,22 @@ public class GamePanel extends JPanel {
                             triggerGameOver(false);
                         }
                     }
-                    projectileIterator.remove();
+                    projectile.markImpact();
                 }
                 continue;
             }
 
             boolean hitEnemy = false;
             for (Enemy enemy : world.getEnemies()) {
+                if (projectile.hasImpacted()) {
+                    break;
+                }
                 if (!enemy.isDead() && projectile.intersects(enemy.getBoundingRectangle())) {
                     enemy.takeDamage(projectile.getDamage());
-                    projectileIterator.remove();
+                    if (enemy.isDead()) {
+                        world.spawnCrystalDrop(enemy);
+                    }
+                    projectile.markImpact();
                     hitEnemy = true;
                     break;
                 }
@@ -547,6 +576,12 @@ public class GamePanel extends JPanel {
         for (Enemy enemy : world.getEnemies()) {
             if (isVisibleOnScreen(enemy.getBoundingRectangle())) {
                 enemy.draw(g2);
+            }
+        }
+
+        for (DroppedCrystal crystal : world.getDroppedCrystals()) {
+            if (isVisibleOnScreen(crystal.getBoundingRectangle())) {
+                crystal.draw(g2);
             }
         }
 
