@@ -371,7 +371,7 @@ public class GamePanel extends JPanel {
         while (projectileIterator.hasNext()) {
             Projectile projectile = projectileIterator.next();
             if (projectile.isEnemyOwned()) {
-                if (projectile.getBounds().intersects(player.getBoundingRectangle())) {
+                if (projectile.intersects(player.getBoundingRectangle())) {
                     if (playerData != null) {
                         playerData.takeDamage(projectile.getDamage());
                         player.triggerDamageFlash();
@@ -386,7 +386,7 @@ public class GamePanel extends JPanel {
 
             boolean hitEnemy = false;
             for (Enemy enemy : world.getEnemies()) {
-                if (!enemy.isDead() && projectile.getBounds().intersects(enemy.getBoundingRectangle())) {
+                if (!enemy.isDead() && projectile.intersects(enemy.getBoundingRectangle())) {
                     enemy.takeDamage(projectile.getDamage());
                     projectileIterator.remove();
                     hitEnemy = true;
@@ -705,9 +705,11 @@ public class GamePanel extends JPanel {
 
         double velocityX = (deltaX / distance) * speed;
         double velocityY = (deltaY / distance) * speed;
+        double hitboxLengthScale = enemyOwned ? 0.38 : 0.42;
+        double hitboxThicknessScale = enemyOwned ? 0.18 : 0.16;
         double rotationRadians = Math.atan2(deltaY, deltaX);
         return new Projectile(startX, startY, velocityX, velocityY, damage, enemyOwned,
-            frameDirectory, renderScale, true, rotationRadians);
+            frameDirectory, renderScale, true, rotationRadians, hitboxLengthScale, hitboxThicknessScale);
     }
 
     private double getDistance(int startX, int startY, int endX, int endY) {

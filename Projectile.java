@@ -1,5 +1,7 @@
 import java.awt.geom.AffineTransform;
 import java.awt.Graphics2D;
+import java.awt.Shape;
+import java.awt.geom.Area;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.HashMap;
@@ -20,13 +22,16 @@ public class Projectile {
     private final BufferedImage[] frames;
     private final boolean baseImageFacesLeft;
     private final double rotationRadians;
+    private final double hitboxLengthScale;
+    private final double hitboxThicknessScale;
     private long animationElapsedMs;
     private int currentFrameIndex;
     private boolean active;
 
     public Projectile(double worldX, double worldY, double velocityX, double velocityY,
                       int damage, boolean enemyOwned, String frameDirectory,
-                      double renderScale, boolean baseImageFacesLeft, double rotationRadians) {
+                      double renderScale, boolean baseImageFacesLeft, double rotationRadians,
+                      double hitboxLengthScale, double hitboxThicknessScale) {
         this.worldX = worldX;
         this.worldY = worldY;
         this.velocityX = velocityX;
@@ -37,6 +42,8 @@ public class Projectile {
         this.frames = loadFrames(frameDirectory);
         this.baseImageFacesLeft = baseImageFacesLeft;
         this.rotationRadians = rotationRadians;
+        this.hitboxLengthScale = hitboxLengthScale;
+        this.hitboxThicknessScale = hitboxThicknessScale;
         this.animationElapsedMs = 0;
         this.currentFrameIndex = 0;
         this.active = true;
@@ -75,6 +82,17 @@ public class Projectile {
     }
 
     public Rectangle2D.Double getBounds() {
+        Rectangle2D bounds = getHitboxShape().getBounds2D();
+        return new Rectangle2D.Double(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
+    }
+
+    public boolean intersects(Rectangle2D targetBounds) {
+        Area projectileArea = new Area(getHitboxShape());
+        projectileArea.intersect(new Area(targetBounds));
+        return !projectileArea.isEmpty();
+    }
+
+    private Shape getHitboxShape() {
         if (frames.length == 0) {
             return new Rectangle2D.Double(worldX, worldY, 1, 1);
         }
@@ -82,7 +100,21 @@ public class Projectile {
         BufferedImage currentFrame = frames[currentFrameIndex];
         double drawWidth = Math.max(1, Math.round(currentFrame.getWidth() * renderScale));
         double drawHeight = Math.max(1, Math.round(currentFrame.getHeight() * renderScale));
-        return new Rectangle2D.Double(worldX - drawWidth / 2.0, worldY - drawHeight / 2.0, drawWidth, drawHeight);
+        double hitboxWidth = Math.max(4.0, drawWidth * hitboxLengthScale);
+        double hitboxHeight = Math.max(4.0, drawHeight * hitboxThicknessScale);
+
+        Rectangle2D.Double baseHitbox = new Rectangle2D.Double(
+            -hitboxWidth / 2.0,
+            -hitboxHeight / 2.0,
+            hitboxWidth,
+            hitboxHeight
+        );
+
+        AffineTransform transform = new AffineTransform();
+        transform.translate(worldX, worldY);
+        double adjustedRotation = baseImageFacesLeft ? rotationRadians + Math.PI : rotationRadians;
+        transform.rotate(adjustedRotation);
+        return transform.createTransformedShape(baseHitbox);
     }
 
     public boolean isOutOfBounds(int worldWidth, int worldHeight) {
