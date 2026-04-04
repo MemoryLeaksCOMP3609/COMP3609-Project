@@ -1,5 +1,6 @@
 import java.awt.Graphics2D;
 import java.awt.geom.Rectangle2D;
+import java.awt.image.BufferedImage;
 
 // Collectible game entities that can be picked up by the player.
 public class Collectible {
@@ -61,6 +62,14 @@ public class Collectible {
     
     public Rectangle2D.Double getBoundingRectangle() {
         return new Rectangle2D.Double(x, y, width, height);
+    }
+
+    public BufferedImage getCurrentBufferedImage() {
+        if (animatedSprite != null) {
+            return animatedSprite.getCurrentBufferedImage();
+        }
+
+        return null;
     }
     
     public boolean isCollected() {

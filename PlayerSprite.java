@@ -106,7 +106,7 @@ public class PlayerSprite extends Sprite {
     // Load sprite animations using StripAnimation class.
     private void loadSpriteAnimations() {
         // Use StripAnimation to load sprite strip and get animations
-        Map<Integer, Animation> animations = StripAnimation.loadSpriteAnimations("images/playerRunningStrip.png", RUN_FRAME_DURATION);
+        Map<Integer, Animation> animations = StripAnimation.loadSpriteAnimations("images/player/playerRunningStrip.png", RUN_FRAME_DURATION);
         
         if (animations == null || animations.isEmpty()) {
             System.out.println("Failed to load playerRunningStrip.png, falling back to player.png");
@@ -134,7 +134,7 @@ public class PlayerSprite extends Sprite {
         if (runDownAnim != null) {
             // Use the first DOWN frame as the default idle pose.
             StripAnimation stripAnim = new StripAnimation();
-            BufferedImage spriteStrip = ImageManager.loadBufferedImage("images/playerRunningStrip.png");
+            BufferedImage spriteStrip = ImageManager.loadBufferedImage("images/player/playerRunningStrip.png");
             if (spriteStrip != null) {
                 BufferedImage[] downFrames = stripAnim.extractFramesFromRow(spriteStrip, ANIM_DIR_DOWN);
                 if (downFrames.length > 0) {
@@ -250,6 +250,7 @@ public class PlayerSprite extends Sprite {
     }
     
     public void update() {
+        syncDimensionsWithCurrentFrame();
         if (currentAnimation != null) {
             currentAnimation.update();
         }
@@ -257,21 +258,25 @@ public class PlayerSprite extends Sprite {
     
     // Draws the player at screen position.
     public void draw(Graphics2D g2) {
-        // Get the current frame image and update dimensions to match
-        if (currentAnimation != null && currentAnimation.getImage() != null) {
-            Image currentFrame = currentAnimation.getImage();
-            width = currentFrame.getWidth(null);
-            height = currentFrame.getHeight(null);
+        syncDimensionsWithCurrentFrame();
+
+        BufferedImage currentFrame = getCurrentBufferedImage();
+        if (currentFrame != null) {
             g2.drawImage(currentFrame, screenX, screenY, width, height, null);
-        } else if (image != null) {
-            width = image.getWidth(null);
-            height = image.getHeight(null);
-            g2.drawImage(image, screenX, screenY, width, height, null);
         }
     }
     
     public Rectangle2D.Double getBoundingRectangle() {
+        syncDimensionsWithCurrentFrame();
         return new Rectangle2D.Double(worldX, worldY, width, height);
+    }
+
+    public BufferedImage getCurrentBufferedImage() {
+        if (currentAnimation != null && currentAnimation.getImage() != null) {
+            return PixelCollision.toBufferedImage(currentAnimation.getImage());
+        }
+
+        return PixelCollision.toBufferedImage(image);
     }
     
     public int getWorldX() {
@@ -322,5 +327,13 @@ public class PlayerSprite extends Sprite {
     
     public void setWorldY(int y) {
         worldY = y;
+    }
+
+    private void syncDimensionsWithCurrentFrame() {
+        BufferedImage currentFrame = getCurrentBufferedImage();
+        if (currentFrame != null) {
+            width = currentFrame.getWidth();
+            height = currentFrame.getHeight();
+        }
     }
 }
