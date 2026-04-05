@@ -17,6 +17,14 @@ public abstract class Weapon {
         return type;
     }
 
+    public String getHudWeaponLabel() {
+        return type.getDisplayName();
+    }
+
+    public void appendHudStats(java.util.List<String> lines, Player playerData) {
+        lines.add("Damage: " + formatMultiplier(playerData.getDamageMultiplier()));
+    }
+
     public abstract void update(long deltaTimeMs, GameWorld world, PlayerSprite player, Player playerData);
 
     public void onUnequipped(GameWorld world) {
@@ -74,5 +82,9 @@ public abstract class Weapon {
         return Projectile.create(startX, startY, velocityX, velocityY, damage, false,
             projectileDirectory, getProjectileScale(playerData), true, rotationRadians,
             hitboxLengthScale, hitboxThicknessScale, weaponType, motionMode);
+    }
+
+    protected String formatMultiplier(double value) {
+        return String.format(java.util.Locale.US, "%.2fx", value);
     }
 }

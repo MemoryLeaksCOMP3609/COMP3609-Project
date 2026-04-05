@@ -88,6 +88,14 @@ public class FireBallWeapon extends Weapon {
         return FIRE_BALL_BASE_PROJECTILE_COUNT + bonusProjectiles;
     }
 
+    @Override
+    public void appendHudStats(java.util.List<String> lines, Player playerData) {
+        super.appendHudStats(lines, playerData);
+        lines.add("Orbit Rate: " + formatMultiplier(playerData.getFireRateMultiplier()));
+        lines.add("Orbit Count: " + getProjectileCount(playerData));
+        lines.add("Projectile Size: " + formatMultiplier(playerData.getProjectileSizeMultiplier()));
+    }
+
     private void removeOrbitingFireballs(GameWorld world) {
         Iterator<Projectile> iterator = world.getProjectiles().iterator();
         while (iterator.hasNext()) {

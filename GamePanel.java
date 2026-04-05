@@ -275,7 +275,6 @@ public class GamePanel extends JPanel {
             sessionState.setGameExiting(false);
 
             if (won) {
-                sessionState.setActiveEffectName("GrayScale");
                 if (world.getBackgroundImage() != null) {
                     BufferedImage backgroundImage = world.getBackgroundImage();
                     BufferedImage grayBg = new BufferedImage(backgroundImage.getWidth(), backgroundImage.getHeight(), BufferedImage.TYPE_INT_ARGB);
@@ -313,13 +312,12 @@ public class GamePanel extends JPanel {
             playerData.updateRegeneration(deltaTime);
         }
 
-        if (sessionState.isGoldenTintActive()) {
+            if (sessionState.isGoldenTintActive()) {
             long remainingGoldenTint = sessionState.getGoldenTintTimer() - deltaTime;
             sessionState.setGoldenTintTimer(remainingGoldenTint);
             if (remainingGoldenTint <= 0) {
                 sessionState.setGoldenTintActive(false);
                 sessionState.setGoldenTintTimer(0);
-                sessionState.setActiveEffectName("None");
             }
         }
 
@@ -465,10 +463,6 @@ public class GamePanel extends JPanel {
 
     public int getTotalCollectibles() {
         return sessionState.getTotalCollectibles();
-    }
-
-    public String getActiveEffectName() {
-        return sessionState.getActiveEffectName();
     }
 
     public void setSelectedWeapon(WeaponType selectedWeapon) {

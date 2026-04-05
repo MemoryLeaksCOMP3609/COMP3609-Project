@@ -28,7 +28,6 @@ public class LevelUpManager {
         }
 
         pendingLevelUpChoices += levelsGained;
-        sessionState.setActiveEffectName("Level Up");
     }
 
     public void processPendingChoices(GameSessionState sessionState, GameWorld world,
@@ -83,7 +82,6 @@ public class LevelUpManager {
         PlayerUpgradeOption selectedUpgrade = currentChoices.get(selectedIndex);
         selectedUpgrade.apply(playerData);
         pendingLevelUpChoices--;
-        sessionState.setActiveEffectName(selectedUpgrade.getDisplayName(playerData));
         if (infoPanel != null) {
             infoPanel.updatePlayerStats(playerData);
         }

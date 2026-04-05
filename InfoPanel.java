@@ -1,7 +1,6 @@
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -9,28 +8,13 @@ import java.util.List;
  * Lightweight HUD model/renderer for player stats in fullscreen mode.
  */
 public class InfoPanel {
-    private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.00");
-
-    private String healthText;
-    private String levelText;
-    private String experienceText;
-    private String speedText;
-    private String damageText;
-    private String fireRateText;
-    private String regenText;
+    private final List<String> hudLines;
     private String fpsText;
-    private String effectText;
 
     public InfoPanel() {
-        healthText = "100 / 100";
-        levelText = "1";
-        experienceText = "0 / 100";
-        speedText = "5";
-        damageText = "1.00x";
-        fireRateText = "1.00x";
-        regenText = "1 / 5s";
+        hudLines = new ArrayList<String>();
         fpsText = "0";
-        effectText = "None";
+        buildDefaultHud();
     }
 
     public void updatePlayerStats(Player player) {
@@ -38,27 +22,27 @@ public class InfoPanel {
             return;
         }
 
-        healthText = player.getHealth() + " / " + player.getMaxHealth();
-        levelText = String.valueOf(player.getLevel());
-        experienceText = player.isMaxLevel()
+        hudLines.clear();
+        hudLines.add("Health: " + player.getHealth() + " / " + player.getMaxHealth());
+        hudLines.add("Level: " + player.getLevel());
+        hudLines.add("XP: " + (player.isMaxLevel()
             ? "MAX"
-            : player.getExperience() + " / " + player.getExperienceToNextLevel();
-        speedText = String.valueOf(player.getMoveSpeed());
-        damageText = DECIMAL_FORMAT.format(player.getDamageMultiplier()) + "x";
-        fireRateText = DECIMAL_FORMAT.format(player.getFireRateMultiplier()) + "x";
-        regenText = player.getHealthRegenPerInterval() + " / 5s";
+            : player.getExperience() + " / " + player.getExperienceToNextLevel()));
+        hudLines.add("Weapon: " + player.getWeaponType().getDisplayName());
+        hudLines.add("Speed: " + player.getMoveSpeed());
+
+        Weapon weapon = player.getWeapon();
+        if (weapon != null) {
+            weapon.appendHudStats(hudLines, player);
+        }
+
+        hudLines.add("Regen: " + player.getHealthRegenPerInterval() + " / 5s");
+        hudLines.add("FPS: " + fpsText);
     }
 
     public void updateFPS(int fps) {
         fpsText = String.valueOf(fps);
-    }
-
-    public void updateActiveEffects(String effectName) {
-        if (effectName == null || effectName.isEmpty()) {
-            effectText = "None";
-        } else {
-            effectText = effectName;
-        }
+        updateOrAppendFpsLine();
     }
 
     public void drawHud(Graphics2D g2, int x, int y) {
@@ -95,16 +79,33 @@ public class InfoPanel {
     }
 
     public String[] getHudLines() {
-        List<String> lines = new ArrayList<String>();
-        lines.add("Health: " + healthText);
-        lines.add("Level: " + levelText);
-        lines.add("XP: " + experienceText);
-        lines.add("Speed: " + speedText);
-        lines.add("Damage: " + damageText);
-        lines.add("Fire Rate: " + fireRateText);
-        lines.add("Regen: " + regenText);
-        lines.add("FPS: " + fpsText);
-        lines.add("Effect: " + effectText);
-        return lines.toArray(new String[0]);
+        return hudLines.toArray(new String[0]);
+    }
+
+    private void buildDefaultHud() {
+        hudLines.clear();
+        hudLines.add("Health: 100 / 100");
+        hudLines.add("Level: 1");
+        hudLines.add("XP: 0 / 100");
+        hudLines.add("Weapon: Fire Arrow");
+        hudLines.add("Speed: 5");
+        hudLines.add("Damage: 1.00x");
+        hudLines.add("Fire Rate: 1.00x");
+        hudLines.add("Projectile Count: 1");
+        hudLines.add("Projectile Size: 1.00x");
+        hudLines.add("Regen: 1 / 5s");
+        hudLines.add("FPS: " + fpsText);
+    }
+
+    private void updateOrAppendFpsLine() {
+        String fpsLine = "FPS: " + fpsText;
+        for (int i = 0; i < hudLines.size(); i++) {
+            if (hudLines.get(i).startsWith("FPS: ")) {
+                hudLines.set(i, fpsLine);
+                return;
+            }
+        }
+
+        hudLines.add(fpsLine);
     }
 }

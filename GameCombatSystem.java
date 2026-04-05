@@ -171,7 +171,6 @@ public class GameCombatSystem {
                 player.activateSpeedBoost();
                 sessionState.setGoldenTintActive(true);
                 sessionState.setGoldenTintTimer(goldenTintDurationMs);
-                sessionState.setActiveEffectName("Golden Tint");
                 queueLevelUpChoices.accept(playerData != null ? playerData.gainExperience(experiencePerCollectible) : 0);
                 world.respawnCollectedCollectible(collectible);
                 sessionState.setTotalCollectibles(world.getCollectibles().size());
@@ -192,7 +191,6 @@ public class GameCombatSystem {
                         queueLevelUpChoices.accept(playerData.gainExperience(crystal.getExperienceValue()));
                     } else if (crystal.getType() == DroppedCrystal.CrystalType.HEALTH) {
                         playerData.heal(HEALTH_PER_CRYSTAL);
-                        sessionState.setActiveEffectName("Health Crystal");
                     }
                 }
                 crystalIterator.remove();
