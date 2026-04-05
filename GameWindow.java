@@ -7,6 +7,7 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
+import java.awt.FontMetrics;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.Window;
@@ -19,6 +20,7 @@ import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 import java.awt.image.BufferStrategy;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
 import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -454,8 +456,8 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
             levelUpOptionBounds[i] = new Rectangle(startX, startY + (i * (cardHeight + gap)), cardWidth, cardHeight);
         }
 
-        int weaponWidth = Math.min(360, screenWidth - 120);
-        int weaponHeight = 62;
+        int weaponWidth = Math.min(500, screenWidth - 120);
+        int weaponHeight = 118;
         int weaponGap = 14;
         int weaponTotalHeight = (weaponHeight * weaponOptions.length) + (weaponGap * (weaponOptions.length - 1));
         int weaponStartX = (screenWidth - weaponWidth) / 2;
@@ -480,9 +482,8 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         drawCenteredTitle(g2, "Choose Your Starting Weapon", screenWidth, screenHeight / 2 - 180, 34);
 
         Font oldFont = g2.getFont();
-        g2.setFont(new Font("Arial", Font.BOLD, 22));
         for (int i = 0; i < weaponOptions.length; i++) {
-            drawChoiceButton(g2, weaponOptionBounds[i], weaponOptions[i].getDisplayName(), weaponOptionHovered[i]);
+            drawWeaponChoiceButton(g2, weaponOptionBounds[i], weaponOptions[i], weaponOptionHovered[i]);
         }
         g2.setFont(oldFont);
     }
@@ -581,6 +582,87 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         int textY = bounds.y + ((bounds.height - g2.getFontMetrics().getHeight()) / 2) + g2.getFontMetrics().getAscent();
         g2.drawString(label, textX, textY);
         g2.setFont(oldFont);
+    }
+
+    private void drawWeaponChoiceButton(Graphics2D g2, Rectangle bounds, WeaponType weaponType, boolean hovered) {
+        if (bounds == null || weaponType == null) {
+            return;
+        }
+
+        g2.setColor(new Color(18, 18, 18, hovered ? 245 : 220));
+        g2.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 22, 22);
+        g2.setColor(hovered ? new Color(255, 220, 120) : Color.WHITE);
+        g2.drawRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 22, 22);
+
+        int padding = 14;
+        int iconSize = bounds.height - (padding * 2);
+        int contentX = bounds.x + padding;
+        int contentY = bounds.y + padding;
+
+        BufferedImage icon = weaponType.getIconImage();
+        if (icon != null) {
+            BufferedImage scaledIcon = ImageManager.scaleImageToHeight(icon, iconSize);
+            if (scaledIcon != null) {
+                int iconY = bounds.y + (bounds.height - scaledIcon.getHeight()) / 2;
+                g2.drawImage(scaledIcon, contentX, iconY, null);
+                contentX += scaledIcon.getWidth() + 14;
+            }
+        }
+
+        Font oldFont = g2.getFont();
+        g2.setColor(hovered ? new Color(255, 220, 120) : Color.WHITE);
+
+        g2.setFont(new Font("Arial", Font.BOLD, 22));
+        int titleY = contentY + g2.getFontMetrics().getAscent();
+        g2.drawString(weaponType.getDisplayName(), contentX, titleY);
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 14));
+        g2.setColor(hovered ? new Color(255, 239, 196) : Color.LIGHT_GRAY);
+        FontMetrics bodyMetrics = g2.getFontMetrics();
+        int availableTextWidth = bounds.x + bounds.width - padding - contentX;
+        int lineY = titleY + 20;
+
+        for (String line : wrapText(weaponType.getDescription(), bodyMetrics, availableTextWidth)) {
+            g2.drawString(line, contentX, lineY);
+            lineY += bodyMetrics.getHeight();
+        }
+
+        for (String line : wrapText(weaponType.getDetailText(), bodyMetrics, availableTextWidth)) {
+            g2.drawString(line, contentX, lineY);
+            lineY += bodyMetrics.getHeight();
+        }
+
+        g2.setFont(oldFont);
+    }
+
+    private List<String> wrapText(String text, FontMetrics metrics, int maxWidth) {
+        List<String> lines = new ArrayList<String>();
+        if (text == null || text.isEmpty()) {
+            return lines;
+        }
+
+        String[] words = text.split("\\s+");
+        StringBuilder currentLine = new StringBuilder();
+
+        for (String word : words) {
+            String candidate = currentLine.length() == 0 ? word : currentLine + " " + word;
+            if (metrics.stringWidth(candidate) <= maxWidth) {
+                currentLine.setLength(0);
+                currentLine.append(candidate);
+            } else {
+                if (currentLine.length() > 0) {
+                    lines.add(currentLine.toString());
+                }
+                currentLine.setLength(0);
+                currentLine.append(word);
+            }
+        }
+
+        if (currentLine.length() > 0) {
+            lines.add(currentLine.toString());
+        }
+
+        return lines;
     }
 
     private void handleWeaponSelectionClick(int mouseX, int mouseY) {
