@@ -1,9 +1,14 @@
 import java.awt.geom.Rectangle2D;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.function.IntConsumer;
 
 public class GameCombatSystem {
     private static final int HEALTH_PER_CRYSTAL = 20;
+    private static final long GHOST_CONTACT_COOLDOWN_MS = 500L;
+    private static final long BOSS_RANGED_ATTACK_COOLDOWN_MS = 1000L;
+    private static final double BOSS_RANGED_PROJECTILE_SCALE = 0.25;
+    private static final double BOSS_RANGED_SPAWN_OFFSET = 100.0;
 
     private final GameWorld world;
     private final GameSessionState sessionState;
@@ -35,24 +40,46 @@ public class GameCombatSystem {
 
         world.getEnemySpawner().update(deltaTimeMs, player, world.getEnemies());
 
+        ArrayList<Enemy> removedEnemies = new ArrayList<Enemy>();
         Iterator<Enemy> enemyIterator = world.getEnemies().iterator();
         while (enemyIterator.hasNext()) {
             Enemy enemy = enemyIterator.next();
-            if (enemy.isDead()) {
+            if (enemy.shouldRemove()) {
+                if (enemy.consumeDefeatReward()) {
+                    world.spawnCrystalDrop(enemy);
+                }
+                removedEnemies.add(enemy);
                 enemyIterator.remove();
                 continue;
             }
 
             enemy.updateDamageFlash(deltaTimeMs);
             enemy.updateAttackCooldown(deltaTimeMs);
-            enemy.update(deltaTimeMs);
-            double distanceToPlayer = getDistance(enemy.getCenterX(), enemy.getCenterY(), player.getCenterX(), player.getCenterY());
 
             if (enemy instanceof BatEnemy) {
-                updateBatEnemy(enemy, player, deltaTimeMs, distanceToPlayer);
-            } else {
+                double distanceToPlayer = getDistance(enemy.getCenterX(), enemy.getCenterY(), player.getCenterX(), player.getCenterY());
+                if (enemy.isAlive()) {
+                    updateBatEnemy(enemy, player, deltaTimeMs, distanceToPlayer);
+                }
+            } else if (enemy instanceof BossEnemy) {
+                BossEnemy boss = (BossEnemy) enemy;
+                boss.updateRangedAttackCooldown(deltaTimeMs);
+                boss.updateBehavior(player, deltaTimeMs);
+                updateBossRangedAttack(boss, player);
+            } else if (enemy instanceof SkeletonEnemy) {
+                ((SkeletonEnemy) enemy).updateBehavior(player, deltaTimeMs);
+            } else if (enemy instanceof GhostEnemy) {
+                ((GhostEnemy) enemy).rememberPlayerPosition(player);
+                ((GhostEnemy) enemy).updateBehavior(player, deltaTimeMs, world.getWorldWidth(), world.getWorldHeight());
+            } else if (enemy.isAlive()) {
                 enemy.moveToward(player.getCenterX(), player.getCenterY(), deltaTimeMs);
             }
+
+            enemy.update(deltaTimeMs);
+        }
+
+        for (Enemy removedEnemy : removedEnemies) {
+            removedEnemy.onRemoved(world);
         }
     }
 
@@ -70,6 +97,39 @@ public class GameCombatSystem {
                 WeaponType.FIRE_ARROW, Projectile.MotionMode.STRAIGHT));
             enemy.setAttackCooldown(batFireIntervalMs);
         }
+    }
+
+    private void updateBossRangedAttack(BossEnemy boss, PlayerSprite player) {
+        if (!boss.isAlive() || !boss.supportsRangedAttack() || boss.isBusyWithMeleeAttack() || !boss.canUseRangedAttack()) {
+            return;
+        }
+
+        int startX = boss.getCenterX();
+        int startY = boss.getCenterY();
+        int targetX = player.getCenterX();
+        int targetY = player.getCenterY();
+        double deltaX = targetX - startX;
+        double deltaY = targetY - startY;
+        double distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        if (distance > 0.001) {
+            startX += (int) Math.round((deltaX / distance) * BOSS_RANGED_SPAWN_OFFSET);
+            startY += (int) Math.round((deltaY / distance) * BOSS_RANGED_SPAWN_OFFSET);
+        }
+
+        world.getProjectiles().add(createProjectile(
+            startX,
+            startY,
+            targetX,
+            targetY,
+            batBulletSpeed,
+            boss.getContactDamage(),
+            true,
+            "images/spells/waterArrow",
+            BOSS_RANGED_PROJECTILE_SCALE,
+            WeaponType.FIRE_ARROW,
+            Projectile.MotionMode.STRAIGHT
+        ));
+        boss.setRangedAttackCooldown(BOSS_RANGED_ATTACK_COOLDOWN_MS);
     }
 
     public void updateProjectiles(long deltaTimeMs, PlayerSprite player) {
@@ -92,6 +152,9 @@ public class GameCombatSystem {
         Rectangle2D.Double playerBounds = player.getBoundingRectangle();
         handleCollectibleCollisions(player, playerData, playerBounds, queueLevelUpChoices);
         handleCrystalCollisions(playerData, playerBounds, queueLevelUpChoices);
+        handleBossContactCollisions(player, playerData, playerBounds, onPlayerDeath);
+        handleSkeletonDashCollisions(player, playerData, playerBounds, onPlayerDeath);
+        handleGhostContactCollisions(player, playerData, playerBounds, onPlayerDeath);
         handleProjectileCollisions(player, playerData, onPlayerDeath);
     }
 
@@ -150,13 +213,89 @@ public class GameCombatSystem {
                 if (projectile.hasImpacted() || !projectile.canDamage()) {
                     break;
                 }
-                if (!enemy.isDead() && projectile.intersects(enemy.getBoundingRectangle())) {
+                if (enemy.canTakeDamage() && projectile.intersects(enemy.getBoundingRectangle())) {
                     enemy.takeDamage(projectile.getDamage());
-                    if (enemy.isDead()) {
-                        world.spawnCrystalDrop(enemy);
-                    }
                     projectile.markImpact();
                     break;
+                }
+            }
+        }
+    }
+
+    private void handleSkeletonDashCollisions(PlayerSprite player, Player playerData,
+                                              Rectangle2D.Double playerBounds, Runnable onPlayerDeath) {
+        if (playerData == null) {
+            return;
+        }
+
+        for (Enemy enemy : world.getEnemies()) {
+            if (!(enemy instanceof SkeletonEnemy)) {
+                continue;
+            }
+
+            SkeletonEnemy skeleton = (SkeletonEnemy) enemy;
+            if (!skeleton.canDamagePlayerOnDash()) {
+                continue;
+            }
+
+            if (PixelCollision.intersects(playerBounds, player.getCurrentBufferedImage(),
+                skeleton.getBoundingRectangle(), skeleton.getCurrentBufferedImage())) {
+                playerData.takeDamage(skeleton.getContactDamage());
+                player.triggerDamageFlash();
+                skeleton.markDashHitApplied();
+                if (playerData.getHealth() <= 0) {
+                    onPlayerDeath.run();
+                }
+            }
+        }
+    }
+
+    private void handleBossContactCollisions(PlayerSprite player, Player playerData,
+                                             Rectangle2D.Double playerBounds, Runnable onPlayerDeath) {
+        if (playerData == null) {
+            return;
+        }
+
+        for (Enemy enemy : world.getEnemies()) {
+            if (!(enemy instanceof BossEnemy) || !enemy.isTargetable()) {
+                continue;
+            }
+
+            BossEnemy boss = (BossEnemy) enemy;
+            if (!boss.hasAttackDamagePending() || !boss.isOnAttackImpactFrame()) {
+                continue;
+            }
+
+            if (PixelCollision.intersects(playerBounds, player.getCurrentBufferedImage(),
+                enemy.getBoundingRectangle(), enemy.getCurrentBufferedImage())) {
+                playerData.takeDamage(enemy.getContactDamage());
+                player.triggerDamageFlash();
+                boss.consumeAttackDamage();
+                if (playerData.getHealth() <= 0) {
+                    onPlayerDeath.run();
+                }
+            }
+        }
+    }
+
+    private void handleGhostContactCollisions(PlayerSprite player, Player playerData,
+                                              Rectangle2D.Double playerBounds, Runnable onPlayerDeath) {
+        if (playerData == null) {
+            return;
+        }
+
+        for (Enemy enemy : world.getEnemies()) {
+            if (!(enemy instanceof GhostEnemy) || !enemy.canAttack() || !enemy.isTargetable()) {
+                continue;
+            }
+
+            if (PixelCollision.intersects(playerBounds, player.getCurrentBufferedImage(),
+                enemy.getBoundingRectangle(), enemy.getCurrentBufferedImage())) {
+                playerData.takeDamage(enemy.getContactDamage());
+                player.triggerDamageFlash();
+                enemy.setAttackCooldown(GHOST_CONTACT_COOLDOWN_MS);
+                if (playerData.getHealth() <= 0) {
+                    onPlayerDeath.run();
                 }
             }
         }

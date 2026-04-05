@@ -21,7 +21,7 @@ public class PlayerSprite extends Sprite {
     private static final long SPEED_BOOST_DURATION = 1000; // 1 second
     private static final int SPEED_BOOST_MULTIPLIER = 3; // 3x speed
     private static final long RUN_FRAME_DURATION = 200;
-    private static final long DAMAGE_FLASH_DURATION_MS = 120;
+    private static final long DAMAGE_FLASH_DURATION_MS = 300;
     private int screenX;
     private int screenY;
     private double preciseScreenX;

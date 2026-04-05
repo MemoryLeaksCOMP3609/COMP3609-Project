@@ -78,6 +78,14 @@ public class Animation {
         }
         return getFrame(currFrameIndex).image;
     }
+
+    public synchronized int getCurrentFrameIndex() {
+        return currFrameIndex;
+    }
+
+    public synchronized int getFrameCount() {
+        return frames.size();
+    }
     
     private AnimFrame getFrame(int i) {
         return frames.get(i);

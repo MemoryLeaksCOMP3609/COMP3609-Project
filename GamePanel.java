@@ -407,6 +407,14 @@ public class GamePanel extends JPanel {
         }
     }
 
+    public void setSelectedEnemyType(EnemySpawnType selectedEnemyType) {
+        world.getEnemySpawner().setSelectedEnemyType(selectedEnemyType);
+    }
+
+    public EnemySpawnType getSelectedEnemyType() {
+        return world.getEnemySpawner().getSelectedEnemyType();
+    }
+
     private void queueLevelUpChoices(int levelsGained) {
         levelUpManager.queueChoices(levelsGained, sessionState);
     }

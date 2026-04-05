@@ -1,11 +1,12 @@
-import java.awt.Graphics2D;
+import java.awt.AlphaComposite;
 import java.awt.Color;
+import java.awt.Graphics2D;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 
 public abstract class Enemy extends Sprite {
-    private static final int DEFAULT_FRAME_COUNT = 5;
+    private static final int DEFAULT_FRAME_COUNT = 4;
     private static final double MOVEMENT_REFERENCE_FRAME_MS = 40.0;
     private static final long DAMAGE_FLASH_DURATION_MS = 120;
 
@@ -32,8 +33,10 @@ public abstract class Enemy extends Sprite {
     protected double renderScale;
     protected long damageFlashRemainingMs;
     protected boolean facingLeft;
+    protected boolean spriteFacesLeftByDefault;
     protected BufferedImage cachedBaseFrame;
     protected BufferedImage cachedDamageFlashFrame;
+    protected boolean defeatRewardGranted;
 
     protected Enemy(String name, int maxHealth, int movementSpeed, int contactDamage,
                     int scoreValue, int experienceReward, int startX, int startY) {
@@ -54,8 +57,10 @@ public abstract class Enemy extends Sprite {
         this.renderScale = 1.0;
         this.damageFlashRemainingMs = 0;
         this.facingLeft = true;
+        this.spriteFacesLeftByDefault = true;
         this.cachedBaseFrame = null;
         this.cachedDamageFlashFrame = null;
+        this.defeatRewardGranted = false;
     }
 
     protected Animation loadStripAnimation(String imagePath, long frameDuration, boolean loop) {
@@ -63,23 +68,44 @@ public abstract class Enemy extends Sprite {
     }
 
     protected Animation loadStripAnimation(String imagePath, long frameDuration, boolean loop, int frameCount) {
+        BufferedImage[] frames = loadStripFrames(imagePath, frameCount);
+        if (frames.length == 0) {
+            return null;
+        }
+        Animation animation = buildAnimation(frames, frameDuration, loop);
+        if (frames.length > 0) {
+            width = frames[0].getWidth();
+            height = frames[0].getHeight();
+            image = frames[0];
+        }
+        return animation;
+    }
+
+    protected BufferedImage[] loadStripFrames(String imagePath, int frameCount) {
         BufferedImage spriteSheet = ImageManager.loadBufferedImage(imagePath);
         if (spriteSheet == null) {
-            return null;
+            return new BufferedImage[0];
         }
 
         int frameWidth = spriteSheet.getWidth() / frameCount;
         int frameHeight = spriteSheet.getHeight();
         StripAnimation stripAnimation = new StripAnimation(frameWidth, frameHeight, frameCount);
-        BufferedImage[] frames = stripAnimation.extractFramesFromRow(spriteSheet, 0);
+        return stripAnimation.extractFramesFromRow(spriteSheet, 0);
+    }
+
+    protected Animation buildAnimation(BufferedImage[] frames, long frameDuration, boolean loop) {
         Animation animation = new Animation(loop);
         for (BufferedImage frame : frames) {
             animation.addFrame(frame, frameDuration);
         }
-        if (frames.length > 0) {
-            width = frames[0].getWidth();
-            height = frames[0].getHeight();
-            image = frames[0];
+        return animation;
+    }
+
+    protected Animation buildAnimation(BufferedImage[] frames, long[] frameDurations, boolean loop) {
+        Animation animation = new Animation(loop);
+        int frameCount = Math.min(frames.length, frameDurations.length);
+        for (int i = 0; i < frameCount; i++) {
+            animation.addFrame(frames[i], frameDurations[i]);
         }
         return animation;
     }
@@ -109,6 +135,11 @@ public abstract class Enemy extends Sprite {
     }
 
     public void update(long deltaTimeMs) {
+        if (isDying()) {
+            updateDeath(deltaTimeMs);
+            return;
+        }
+
         if (currentAnimation != null) {
             currentAnimation.update(deltaTimeMs);
             syncDimensionsWithCurrentFrame();
@@ -128,13 +159,14 @@ public abstract class Enemy extends Sprite {
         moveToward(targetX, targetY, 0, deltaTimeMs);
     }
 
-    public void moveToward(int targetX, int targetY, int stopDistance, long deltaTimeMs) {
-        if (isDead()) {
+    protected void moveTowardWithSpeedMultiplier(int targetX, int targetY, int stopDistance,
+                                                 long deltaTimeMs, double speedMultiplier) {
+        if (!isAlive()) {
             return;
         }
 
-        double deltaX = targetX - worldX;
-        double deltaY = targetY - worldY;
+        double deltaX = targetX - getCenterX();
+        double deltaY = targetY - getCenterY();
         double distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
         if (distance <= stopDistance || distance == 0) {
@@ -142,13 +174,11 @@ public abstract class Enemy extends Sprite {
             return;
         }
 
-        double moveDistance = movementSpeed * (deltaTimeMs / MOVEMENT_REFERENCE_FRAME_MS);
+        double moveDistance = movementSpeed * speedMultiplier * (deltaTimeMs / MOVEMENT_REFERENCE_FRAME_MS);
         double directionX = deltaX / distance;
         double directionY = deltaY / distance;
 
-        if (Math.abs(directionX) > 0.001) {
-            facingLeft = directionX < 0;
-        }
+        updateFacingDirection(directionX);
 
         worldX += (int) Math.round(directionX * moveDistance);
         worldY += (int) Math.round(directionY * moveDistance);
@@ -156,14 +186,28 @@ public abstract class Enemy extends Sprite {
         setAnimationForState(EnemyState.MOVING);
     }
 
+    public void moveToward(int targetX, int targetY, int stopDistance, long deltaTimeMs) {
+        moveTowardWithSpeedMultiplier(targetX, targetY, stopDistance, deltaTimeMs, 1.0);
+    }
+
+    protected void faceToward(int targetX) {
+        updateFacingDirection(targetX - getCenterX());
+    }
+
+    protected void updateFacingDirection(double directionX) {
+        if (Math.abs(directionX) > 0.001) {
+            facingLeft = directionX < 0;
+        }
+    }
+
     public void attack() {
-        if (!isDead()) {
+        if (isAlive()) {
             setAnimationForState(EnemyState.ATTACKING);
         }
     }
 
     public void takeDamage(int damage) {
-        if (damage <= 0 || isDead()) {
+        if (damage <= 0 || !canTakeDamage()) {
             return;
         }
 
@@ -175,33 +219,60 @@ public abstract class Enemy extends Sprite {
     }
 
     public void die() {
+        if (isDying() || isDead()) {
+            return;
+        }
+
         setAnimationForState(EnemyState.DYING);
-        state = EnemyState.DEAD;
+        onDeathStarted();
     }
 
     public boolean isDead() {
-        return state == EnemyState.DEAD || currentHealth <= 0;
+        return state == EnemyState.DEAD;
+    }
+
+    public boolean isDying() {
+        return state == EnemyState.DYING;
+    }
+
+    public boolean isDefeated() {
+        return currentHealth <= 0 || isDying() || isDead();
+    }
+
+    public boolean isAlive() {
+        return !isDefeated();
+    }
+
+    public boolean isTargetable() {
+        return isAlive();
+    }
+
+    public boolean canTakeDamage() {
+        return isAlive();
+    }
+
+    public boolean shouldRemove() {
+        return state == EnemyState.DEAD;
+    }
+
+    public boolean consumeDefeatReward() {
+        if (currentHealth > 0 || !isDead() || defeatRewardGranted) {
+            return false;
+        }
+
+        defeatRewardGranted = true;
+        return true;
+    }
+
+    public void onRemoved(GameWorld world) {
+        // Default enemies do not spawn anything on removal.
     }
 
     @Override
     public void draw(Graphics2D g2) {
-        BufferedImage currentFrame = getCurrentBufferedImage();
-        if (currentFrame != null) {
-            BufferedImage frameToDraw = currentFrame;
-            if (damageFlashRemainingMs > 0) {
-                frameToDraw = getDamageFlashFrame(currentFrame);
-            }
-            if (facingLeft) {
-                g2.drawImage(frameToDraw, screenX, screenY, width, height, null);
-            } else {
-                AffineTransform originalTransform = g2.getTransform();
-                AffineTransform flippedTransform = new AffineTransform();
-                flippedTransform.translate(screenX + width, screenY);
-                flippedTransform.scale(-1, 1);
-                g2.transform(flippedTransform);
-                g2.drawImage(frameToDraw, 0, 0, width, height, null);
-                g2.setTransform(originalTransform);
-            }
+        BufferedImage frameToDraw = getFrameToDraw();
+        if (frameToDraw != null) {
+            drawFrame(g2, frameToDraw, 1.0f);
         }
     }
 
@@ -309,5 +380,61 @@ public abstract class Enemy extends Sprite {
         }
 
         return cachedDamageFlashFrame;
+    }
+
+    protected BufferedImage getFrameToDraw() {
+        BufferedImage currentFrame = getCurrentBufferedImage();
+        if (currentFrame == null) {
+            return null;
+        }
+
+        if (damageFlashRemainingMs > 0) {
+            return getDamageFlashFrame(currentFrame);
+        }
+
+        return currentFrame;
+    }
+
+    protected void drawFrame(Graphics2D g2, BufferedImage frameToDraw, float alpha) {
+        if (frameToDraw == null || alpha <= 0.0f) {
+            return;
+        }
+
+        AffineTransform originalTransform = g2.getTransform();
+        java.awt.Composite originalComposite = g2.getComposite();
+
+        if (alpha < 1.0f) {
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+        }
+
+        if (facingLeft == spriteFacesLeftByDefault) {
+            g2.drawImage(frameToDraw, screenX, screenY, width, height, null);
+        } else {
+            AffineTransform flippedTransform = new AffineTransform();
+            flippedTransform.translate(screenX + width, screenY);
+            flippedTransform.scale(-1, 1);
+            g2.transform(flippedTransform);
+            g2.drawImage(frameToDraw, 0, 0, width, height, null);
+        }
+
+        g2.setTransform(originalTransform);
+        g2.setComposite(originalComposite);
+    }
+
+    protected void onDeathStarted() {
+        // Default death behavior only plays the death animation in place.
+    }
+
+    protected void updateDeath(long deltaTimeMs) {
+        if (currentAnimation != null) {
+            currentAnimation.update(deltaTimeMs);
+            syncDimensionsWithCurrentFrame();
+            if (!currentAnimation.isActive()) {
+                state = EnemyState.DEAD;
+            }
+            return;
+        }
+
+        state = EnemyState.DEAD;
     }
 }

@@ -16,6 +16,15 @@ public enum PlayerUpgradeOption {
         public void apply(Player player) {
             player.increaseFireRateMultiplier(0.15);
         }
+
+        @Override
+        public String getDisplayName(Player player) {
+            if (player != null && player.getWeaponType() == WeaponType.FIRE_BALL) {
+                return "Orbit Rate +0.15x";
+            }
+
+            return super.getDisplayName(player);
+        }
     },
     MAX_HEALTH("Max Health +20") {
         @Override
@@ -49,15 +58,17 @@ public enum PlayerUpgradeOption {
             return true;
         }
     },
-    PROJECTILE_SIZE("Projectile Size +0.15x") {
+    PROJECTILE_SIZE("Projectile Size +0.25x") {
         @Override
         public void apply(Player player) {
-            player.increaseProjectileSizeMultiplier(0.15);
+            player.increaseProjectileSizeMultiplier(0.25);
         }
 
         @Override
         public boolean isAvailable(Player player) {
-            return player != null && player.getWeaponType() == WeaponType.FIRE_BALL;
+            return player != null
+                && player.getWeaponType() == WeaponType.FIRE_BALL
+                && player.getProjectileSizeMultiplier() < Player.MAX_PROJECTILE_SIZE_MULTIPLIER;
         }
     };
 
@@ -69,6 +80,10 @@ public enum PlayerUpgradeOption {
 
     public String getDisplayName() {
         return displayName;
+    }
+
+    public String getDisplayName(Player player) {
+        return getDisplayName();
     }
 
     public boolean isAvailable(Player player) {
