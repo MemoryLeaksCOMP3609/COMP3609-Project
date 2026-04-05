@@ -445,8 +445,8 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
     }
 
     private void updateChoiceBounds(int screenWidth, int screenHeight) {
-        int cardWidth = Math.min(320, screenWidth - 120);
-        int cardHeight = 72;
+        int cardWidth = Math.min(420, screenWidth - 120);
+        int cardHeight = 80;
         int gap = 18;
         int totalHeight = (cardHeight * 3) + (gap * 2);
         int startX = (screenWidth - cardWidth) / 2;
@@ -499,10 +499,11 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
 
         List<PlayerUpgradeOption> choices = gamePanel.getLevelUpChoices();
         for (int i = 0; i < choices.size() && i < levelUpOptionBounds.length; i++) {
-            drawChoiceButton(
+            drawLevelUpChoiceButton(
                 g2,
                 levelUpOptionBounds[i],
-                choices.get(i).getDisplayName(gamePanel.getPlayerData()),
+                choices.get(i),
+                gamePanel.getPlayerData(),
                 levelUpOptionHovered[i]
             );
         }
@@ -632,6 +633,41 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
             lineY += bodyMetrics.getHeight();
         }
 
+        g2.setFont(oldFont);
+    }
+
+    private void drawLevelUpChoiceButton(Graphics2D g2, Rectangle bounds, PlayerUpgradeOption option,
+                                         Player player, boolean hovered) {
+        if (bounds == null || option == null) {
+            return;
+        }
+
+        g2.setColor(new Color(18, 18, 18, hovered ? 245 : 220));
+        g2.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 22, 22);
+        g2.setColor(hovered ? new Color(255, 220, 120) : Color.WHITE);
+        g2.drawRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 22, 22);
+
+        int padding = 14;
+        int iconSize = bounds.height - (padding * 2);
+        int contentX = bounds.x + padding;
+
+        BufferedImage icon = option.getIconImage();
+        if (icon != null) {
+            BufferedImage scaledIcon = ImageManager.scaleImageToHeight(icon, iconSize);
+            if (scaledIcon != null) {
+                int iconY = bounds.y + (bounds.height - scaledIcon.getHeight()) / 2;
+                g2.drawImage(scaledIcon, contentX, iconY, null);
+                contentX += scaledIcon.getWidth() + 14;
+            }
+        }
+
+        Font oldFont = g2.getFont();
+        g2.setFont(new Font("Arial", Font.BOLD, 22));
+        g2.setColor(hovered ? new Color(255, 220, 120) : Color.WHITE);
+
+        String label = option.getDisplayName(player);
+        int textY = bounds.y + ((bounds.height - g2.getFontMetrics().getHeight()) / 2) + g2.getFontMetrics().getAscent();
+        g2.drawString(label, contentX, textY);
         g2.setFont(oldFont);
     }
 
