@@ -1,11 +1,15 @@
 import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 import java.util.Random;
 
 public abstract class GhostEnemy extends Enemy {
+    private static final float DEATH_MIN_OPACITY_RATIO = 0.5f;
     private static final long FADE_OUT_DURATION_MS = 3000L;
     private static final long INVISIBLE_DURATION_MS = 1000L;
     private static final long FADE_IN_DURATION_MS = 1000L;
     private static final long VISIBLE_DURATION_MS = 1000L;
+    private static final long GHOST_DEATH_DURATION_MS = 1000L;
+    private static final long[] DEATH_FRAME_DURATIONS_MS = {250L, 250L, 250L, 250L};
 
     protected final double transparency;
     private final Random random;
@@ -13,6 +17,9 @@ public abstract class GhostEnemy extends Enemy {
     private long phaseElapsedMs;
     private double teleportRadius;
     private float currentOpacity;
+    private long deathElapsedMs;
+    private double deathRunDirectionX;
+    private double deathRunDirectionY;
 
     protected GhostEnemy(String name, int maxHealth, int movementSpeed, int contactDamage,
                          int scoreValue, int experienceReward, double transparency,
@@ -24,6 +31,9 @@ public abstract class GhostEnemy extends Enemy {
         this.phaseElapsedMs = 0L;
         this.teleportRadius = 0.0;
         this.currentOpacity = (float) transparency;
+        this.deathElapsedMs = 0L;
+        this.deathRunDirectionX = 0.0;
+        this.deathRunDirectionY = 0.0;
     }
 
     public double getTransparency() {
@@ -31,7 +41,7 @@ public abstract class GhostEnemy extends Enemy {
     }
 
     public void updateBehavior(PlayerSprite player, long deltaTimeMs, int worldWidth, int worldHeight) {
-        if (player == null || isDead()) {
+        if (player == null || !isAlive()) {
             return;
         }
 
@@ -100,6 +110,53 @@ public abstract class GhostEnemy extends Enemy {
         drawFrame(g2, getFrameToDraw(), currentOpacity);
     }
 
+    @Override
+    protected void onDeathStarted() {
+        phase = GhostPhase.DEAD;
+        phaseElapsedMs = 0L;
+        deathElapsedMs = 0L;
+        currentOpacity = (float) transparency;
+        deathAnimation = buildAnimation(loadDeathFrames(), DEATH_FRAME_DURATIONS_MS, false);
+        currentAnimation = deathAnimation != null ? deathAnimation : idleAnimation;
+        if (currentAnimation != null) {
+            currentAnimation.start();
+        }
+
+        deathRunDirectionX = 0.0;
+        deathRunDirectionY = 1.0;
+        if (lastKnownPlayerCenterX != Integer.MIN_VALUE && lastKnownPlayerCenterY != Integer.MIN_VALUE) {
+            double awayX = getCenterX() - lastKnownPlayerCenterX;
+            double awayY = getCenterY() - lastKnownPlayerCenterY;
+            double distance = Math.sqrt(awayX * awayX + awayY * awayY);
+            if (distance > 0.001) {
+                deathRunDirectionX = awayX / distance;
+                deathRunDirectionY = awayY / distance;
+                updateFacingDirection(-deathRunDirectionX);
+            }
+        }
+    }
+
+    @Override
+    protected void updateDeath(long deltaTimeMs) {
+        deathElapsedMs = Math.min(GHOST_DEATH_DURATION_MS, deathElapsedMs + deltaTimeMs);
+        double moveDistance = movementSpeed * (deltaTimeMs / 40.0);
+        worldX += (int) Math.round(deathRunDirectionX * moveDistance);
+        worldY += (int) Math.round(deathRunDirectionY * moveDistance);
+        double progress = (double) deathElapsedMs / GHOST_DEATH_DURATION_MS;
+        double opacityRatio = 1.0 - ((1.0 - DEATH_MIN_OPACITY_RATIO) * Math.min(1.0, progress));
+        currentOpacity = (float) (transparency * opacityRatio);
+
+        if (currentAnimation != null) {
+            currentAnimation.update(deltaTimeMs);
+            syncDimensionsWithCurrentFrame();
+        }
+
+        if (deathElapsedMs >= GHOST_DEATH_DURATION_MS) {
+            currentOpacity = (float) (transparency * DEATH_MIN_OPACITY_RATIO);
+            state = EnemyState.DEAD;
+        }
+    }
+
     private double getDistanceToPlayer(PlayerSprite player) {
         double deltaX = player.getCenterX() - getCenterX();
         double deltaY = player.getCenterY() - getCenterY();
@@ -132,10 +189,31 @@ public abstract class GhostEnemy extends Enemy {
         return Math.max(min, Math.min(value, max));
     }
 
+    private BufferedImage[] loadDeathFrames() {
+        BufferedImage[] frames = new BufferedImage[0];
+        if (deathAnimation == null) {
+            return frames;
+        }
+        return loadStripFrames(getDeathSpritePath(), 4);
+    }
+
+    protected abstract String getDeathSpritePath();
+
+    private int lastKnownPlayerCenterX = Integer.MIN_VALUE;
+    private int lastKnownPlayerCenterY = Integer.MIN_VALUE;
+
+    public void rememberPlayerPosition(PlayerSprite player) {
+        if (player != null) {
+            lastKnownPlayerCenterX = player.getCenterX();
+            lastKnownPlayerCenterY = player.getCenterY();
+        }
+    }
+
     private enum GhostPhase {
         FADING_OUT,
         INVISIBLE,
         FADING_IN,
-        VISIBLE
+        VISIBLE,
+        DEAD
     }
 }

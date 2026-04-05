@@ -9,4 +9,9 @@ public class DarkGhostEnemy extends GhostEnemy {
         idleAnimation = moveAnimation;
         setAnimationForState(EnemyState.MOVING);
     }
+
+    @Override
+    protected String getDeathSpritePath() {
+        return "images/enemies/ghost/ghostDDeath.png";
+    }
 }

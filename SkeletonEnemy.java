@@ -7,6 +7,7 @@ public abstract class SkeletonEnemy extends Enemy {
     private static final long DASH_DURATION_MS = 120;
     private static final long RECOVERY_DURATION_MS = 120;
     private static final double DASH_DISTANCE = 300.0;
+    private static final long[] DEATH_FRAME_DURATIONS_MS = {500L, 500L, 500L, 2000L};
 
     private Animation windupAnimation;
     private Animation dashAnimation;
@@ -33,14 +34,14 @@ public abstract class SkeletonEnemy extends Enemy {
     protected void loadSkeletonAnimations(String movePath, String attackPath, String deathPath, long frameDuration) {
         moveAnimation = loadStripAnimation(movePath, frameDuration, true);
         attackAnimation = loadStripAnimation(attackPath, frameDuration, true);
-        deathAnimation = loadStripAnimation(deathPath, frameDuration, false);
+        deathAnimation = buildAnimation(loadStripFrames(deathPath, 4), DEATH_FRAME_DURATIONS_MS, false);
         idleAnimation = moveAnimation;
         loadAttackSequenceAnimations(attackPath);
         setAnimationForState(EnemyState.MOVING);
     }
 
     public void updateBehavior(PlayerSprite player, long deltaTimeMs) {
-        if (player == null || isDead()) {
+        if (player == null || !isAlive()) {
             return;
         }
 

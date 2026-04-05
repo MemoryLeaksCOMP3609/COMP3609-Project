@@ -36,6 +36,7 @@ public abstract class Enemy extends Sprite {
     protected boolean spriteFacesLeftByDefault;
     protected BufferedImage cachedBaseFrame;
     protected BufferedImage cachedDamageFlashFrame;
+    protected boolean defeatRewardGranted;
 
     protected Enemy(String name, int maxHealth, int movementSpeed, int contactDamage,
                     int scoreValue, int experienceReward, int startX, int startY) {
@@ -59,6 +60,7 @@ public abstract class Enemy extends Sprite {
         this.spriteFacesLeftByDefault = true;
         this.cachedBaseFrame = null;
         this.cachedDamageFlashFrame = null;
+        this.defeatRewardGranted = false;
     }
 
     protected Animation loadStripAnimation(String imagePath, long frameDuration, boolean loop) {
@@ -70,10 +72,7 @@ public abstract class Enemy extends Sprite {
         if (frames.length == 0) {
             return null;
         }
-        Animation animation = new Animation(loop);
-        for (BufferedImage frame : frames) {
-            animation.addFrame(frame, frameDuration);
-        }
+        Animation animation = buildAnimation(frames, frameDuration, loop);
         if (frames.length > 0) {
             width = frames[0].getWidth();
             height = frames[0].getHeight();
@@ -92,6 +91,23 @@ public abstract class Enemy extends Sprite {
         int frameHeight = spriteSheet.getHeight();
         StripAnimation stripAnimation = new StripAnimation(frameWidth, frameHeight, frameCount);
         return stripAnimation.extractFramesFromRow(spriteSheet, 0);
+    }
+
+    protected Animation buildAnimation(BufferedImage[] frames, long frameDuration, boolean loop) {
+        Animation animation = new Animation(loop);
+        for (BufferedImage frame : frames) {
+            animation.addFrame(frame, frameDuration);
+        }
+        return animation;
+    }
+
+    protected Animation buildAnimation(BufferedImage[] frames, long[] frameDurations, boolean loop) {
+        Animation animation = new Animation(loop);
+        int frameCount = Math.min(frames.length, frameDurations.length);
+        for (int i = 0; i < frameCount; i++) {
+            animation.addFrame(frames[i], frameDurations[i]);
+        }
+        return animation;
     }
 
     protected void setAnimationForState(EnemyState nextState) {
@@ -119,6 +135,11 @@ public abstract class Enemy extends Sprite {
     }
 
     public void update(long deltaTimeMs) {
+        if (isDying()) {
+            updateDeath(deltaTimeMs);
+            return;
+        }
+
         if (currentAnimation != null) {
             currentAnimation.update(deltaTimeMs);
             syncDimensionsWithCurrentFrame();
@@ -139,7 +160,7 @@ public abstract class Enemy extends Sprite {
     }
 
     public void moveToward(int targetX, int targetY, int stopDistance, long deltaTimeMs) {
-        if (isDead()) {
+        if (!isAlive()) {
             return;
         }
 
@@ -175,7 +196,7 @@ public abstract class Enemy extends Sprite {
     }
 
     public void attack() {
-        if (!isDead()) {
+        if (isAlive()) {
             setAnimationForState(EnemyState.ATTACKING);
         }
     }
@@ -193,20 +214,49 @@ public abstract class Enemy extends Sprite {
     }
 
     public void die() {
+        if (isDying() || isDead()) {
+            return;
+        }
+
         setAnimationForState(EnemyState.DYING);
-        state = EnemyState.DEAD;
+        onDeathStarted();
     }
 
     public boolean isDead() {
-        return state == EnemyState.DEAD || currentHealth <= 0;
+        return state == EnemyState.DEAD;
+    }
+
+    public boolean isDying() {
+        return state == EnemyState.DYING;
+    }
+
+    public boolean isDefeated() {
+        return currentHealth <= 0 || isDying() || isDead();
+    }
+
+    public boolean isAlive() {
+        return !isDefeated();
     }
 
     public boolean isTargetable() {
-        return !isDead();
+        return isAlive();
     }
 
     public boolean canTakeDamage() {
-        return !isDead();
+        return isAlive();
+    }
+
+    public boolean shouldRemove() {
+        return state == EnemyState.DEAD;
+    }
+
+    public boolean consumeDefeatReward() {
+        if (currentHealth > 0 || !isDead() || defeatRewardGranted) {
+            return false;
+        }
+
+        defeatRewardGranted = true;
+        return true;
     }
 
     @Override
@@ -360,5 +410,22 @@ public abstract class Enemy extends Sprite {
 
         g2.setTransform(originalTransform);
         g2.setComposite(originalComposite);
+    }
+
+    protected void onDeathStarted() {
+        // Default death behavior only plays the death animation in place.
+    }
+
+    protected void updateDeath(long deltaTimeMs) {
+        if (currentAnimation != null) {
+            currentAnimation.update(deltaTimeMs);
+            syncDimensionsWithCurrentFrame();
+            if (!currentAnimation.isActive()) {
+                state = EnemyState.DEAD;
+            }
+            return;
+        }
+
+        state = EnemyState.DEAD;
     }
 }

@@ -39,7 +39,10 @@ public class GameCombatSystem {
         Iterator<Enemy> enemyIterator = world.getEnemies().iterator();
         while (enemyIterator.hasNext()) {
             Enemy enemy = enemyIterator.next();
-            if (enemy.isDead()) {
+            if (enemy.shouldRemove()) {
+                if (enemy.consumeDefeatReward()) {
+                    world.spawnCrystalDrop(enemy);
+                }
                 enemyIterator.remove();
                 continue;
             }
@@ -49,12 +52,15 @@ public class GameCombatSystem {
 
             if (enemy instanceof BatEnemy) {
                 double distanceToPlayer = getDistance(enemy.getCenterX(), enemy.getCenterY(), player.getCenterX(), player.getCenterY());
-                updateBatEnemy(enemy, player, deltaTimeMs, distanceToPlayer);
+                if (enemy.isAlive()) {
+                    updateBatEnemy(enemy, player, deltaTimeMs, distanceToPlayer);
+                }
             } else if (enemy instanceof SkeletonEnemy) {
                 ((SkeletonEnemy) enemy).updateBehavior(player, deltaTimeMs);
             } else if (enemy instanceof GhostEnemy) {
+                ((GhostEnemy) enemy).rememberPlayerPosition(player);
                 ((GhostEnemy) enemy).updateBehavior(player, deltaTimeMs, world.getWorldWidth(), world.getWorldHeight());
-            } else {
+            } else if (enemy.isAlive()) {
                 enemy.moveToward(player.getCenterX(), player.getCenterY(), deltaTimeMs);
             }
 
@@ -160,9 +166,6 @@ public class GameCombatSystem {
                 }
                 if (enemy.canTakeDamage() && projectile.intersects(enemy.getBoundingRectangle())) {
                     enemy.takeDamage(projectile.getDamage());
-                    if (enemy.isDead()) {
-                        world.spawnCrystalDrop(enemy);
-                    }
                     projectile.markImpact();
                     break;
                 }

@@ -58,7 +58,7 @@ public class EnemySpawner {
     private int countLivingEnemiesOfSelectedType(ArrayList<Enemy> enemies) {
         int count = 0;
         for (Enemy enemy : enemies) {
-            if (matchesSelectedType(enemy) && !enemy.isDead()) {
+            if (matchesSelectedType(enemy) && enemy.isAlive()) {
                 count++;
             }
         }

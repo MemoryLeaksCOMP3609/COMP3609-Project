@@ -9,4 +9,9 @@ public class FrostGhostEnemy extends GhostEnemy {
         idleAnimation = moveAnimation;
         setAnimationForState(EnemyState.MOVING);
     }
+
+    @Override
+    protected String getDeathSpritePath() {
+        return "images/enemies/ghost/ghostFDeath.png";
+    }
 }
