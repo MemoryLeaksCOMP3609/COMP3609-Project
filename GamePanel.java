@@ -9,7 +9,7 @@ public class GamePanel extends JPanel {
     private static final int PANEL_HEIGHT = 600;
     private static final int WORLD_WIDTH = 2500;
     private static final int WORLD_HEIGHT = 2500;
-    private static final int TOTAL_COLLECTIBLES = 11;
+    private static final int TOTAL_COLLECTIBLES = 3;
     private static final int EXPERIENCE_PER_COLLECTIBLE = 25;
     private static final long GOLDEN_TINT_DURATION = 1000;
     private static final int GOLDEN_TINT_COLOR = 0x80FFD700;

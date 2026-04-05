@@ -32,6 +32,8 @@ public class GameWorld {
     private ArrayList<DroppedCrystal> droppedCrystals;
     private int cameraX;
     private int cameraY;
+    private int viewportWidth;
+    private int viewportHeight;
 
     public GameWorld(int worldWidth, int worldHeight) {
         this.worldWidth = worldWidth;
@@ -59,6 +61,8 @@ public class GameWorld {
         this.droppedCrystals = new ArrayList<DroppedCrystal>();
         this.cameraX = 0;
         this.cameraY = 0;
+        this.viewportWidth = worldWidth;
+        this.viewportHeight = worldHeight;
     }
 
     public void initializeEntities(javax.swing.JPanel panel, int winCollectibles) {
@@ -88,6 +92,8 @@ public class GameWorld {
             return;
         }
 
+        viewportWidth = Math.max(1, panelWidth);
+        viewportHeight = Math.max(1, panelHeight);
         cameraX = player.getWorldX() - panelWidth / 2 + player.getWidth() / 2;
         cameraY = player.getWorldY() - panelHeight / 2 + player.getHeight() / 2;
         cameraX = Math.max(0, Math.min(cameraX, worldWidth - panelWidth));
@@ -116,7 +122,9 @@ public class GameWorld {
         }
 
         if (arrowSprite != null && player != null) {
-            arrowSprite.update(player.getScreenX(), player.getScreenY(), collectibles);
+            int playerCenterX = player.getScreenX() + player.getWidth() / 2;
+            int playerCenterY = player.getScreenY() + player.getHeight() / 2;
+            arrowSprite.update(playerCenterX, playerCenterY, viewportWidth, viewportHeight, collectibles);
         }
     }
 

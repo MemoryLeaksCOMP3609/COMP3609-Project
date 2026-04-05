@@ -6,12 +6,15 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 
 /**
- * Arrow sprite, positions itself 250px from the player in the direction
- * of the nearest uncollected collectible coin, pointing towards it.
- * Uses DisappearFX for the fading effect.
+ * Arrow sprite that points toward the nearest uncollected collectible.
+ * Its screen position is derived from the active viewport so it stays visible
+ * in fullscreen instead of relying on the old fixed 800x600 layout.
  */
 public class ArrowSprite {
-    
+    private static final int EDGE_PADDING = 48;
+    private static final double VISIBLE_COIN_SAFE_ZONE_RATIO = 0.80;
+    private static final float MIN_ALPHA = 0.0f;
+    private static final float MAX_ALPHA = 1.0f;
     private BufferedImage originalImage;
     private BufferedImage currentImage;
     private DisappearFX disappearFX;
@@ -19,8 +22,7 @@ public class ArrowSprite {
     private int screenY;
     private double rotationAngle;
     private float currentAlpha;
-    private static final double ORBIT_DISTANCE = 250;
-    private static final int MIN_FADE_DISTANCE = 300;
+    private static final int MIN_FADE_DISTANCE = 50;
     
     // Arrow dimensions
     private int width;
@@ -48,31 +50,59 @@ public class ArrowSprite {
         currentAlpha = 1.0f;
     }
     
-    public void update(int playerScreenX, int playerScreenY, ArrayList<Collectible> collectibles) {
+    public void update(int playerCenterX, int playerCenterY, int viewportWidth, int viewportHeight,
+                       ArrayList<Collectible> collectibles) {
+        if (hasVisibleCollectibleInSafeZone(collectibles, viewportWidth, viewportHeight)) {
+            screenX = playerCenterX - width / 2;
+            screenY = playerCenterY - height / 2;
+            rotationAngle = 0;
+            currentAlpha = 0.0f;
+            disappearFX.setPosition(screenX, screenY);
+            return;
+        }
+
         // Find the nearest uncollected collectible relative to the player
-        Collectible nearestCoin = findNearestUncollectedCoin(playerScreenX, playerScreenY, collectibles);
+        Collectible nearestCoin = findNearestUncollectedCoin(playerCenterX, playerCenterY, collectibles);
         
         if (nearestCoin != null) {
             // Calculate the distance from player to nearest coin
-            double dx = nearestCoin.getScreenX() - playerScreenX;
-            double dy = nearestCoin.getScreenY() - playerScreenY;
-            double distance = Math.sqrt(dx * dx + dy * dy);
-            
-            // Calculate alpha based on distance:
-            if (distance >= 500) {
-                currentAlpha = 1.0f;
-            } else if (distance <= MIN_FADE_DISTANCE) {
-                currentAlpha = 0.0f;
-            } else {
-                currentAlpha = (float)((distance - MIN_FADE_DISTANCE) / 200);
-            }
+            double targetCenterX = nearestCoin.getScreenX() + width / 2.0;
+            double targetCenterY = nearestCoin.getScreenY() + height / 2.0;
+            double dx = targetCenterX - playerCenterX;
+            double dy = targetCenterY - playerCenterY;
             
             // Calculate the angle from player to coin (in radians)
             double angleToCoin = Math.atan2(dy, dx);
             
-            // Position the arrow at 250px from player in the direction of the coin
-            screenX = playerScreenX + (int)(Math.cos(angleToCoin) * ORBIT_DISTANCE);
-            screenY = playerScreenY + (int)(Math.sin(angleToCoin) * ORBIT_DISTANCE);
+            // Anchor the arrow along the direction ray while keeping it inside
+            // the current viewport with a consistent edge margin.
+            double placementDistance = getViewportBoundDistance(
+                playerCenterX,
+                playerCenterY,
+                Math.cos(angleToCoin),
+                Math.sin(angleToCoin),
+                viewportWidth,
+                viewportHeight
+            );
+            int arrowCenterX = playerCenterX + (int) Math.round(Math.cos(angleToCoin) * placementDistance);
+            int arrowCenterY = playerCenterY + (int) Math.round(Math.sin(angleToCoin) * placementDistance);
+            screenX = arrowCenterX - width / 2;
+            screenY = arrowCenterY - height / 2;
+
+            double arrowToCoinDx = targetCenterX - arrowCenterX;
+            double arrowToCoinDy = targetCenterY - arrowCenterY;
+            double arrowToCoinDistance = Math.sqrt(arrowToCoinDx * arrowToCoinDx + arrowToCoinDy * arrowToCoinDy);
+
+            // Keep the same fade thresholds, but base them on the arrow's
+            // current position instead of the player's screen position.
+            if (arrowToCoinDistance >= 500) {
+                currentAlpha = 1.0f;
+            } else if (arrowToCoinDistance <= MIN_FADE_DISTANCE) {
+                currentAlpha = 0.0f;
+            } else {
+                currentAlpha = (float) ((arrowToCoinDistance - MIN_FADE_DISTANCE) / 200);
+            }
+            currentAlpha = clampAlpha(currentAlpha);
             
             // Update DisappearFX position
             disappearFX.setPosition(screenX, screenY);
@@ -80,10 +110,10 @@ public class ArrowSprite {
             // Convert to degrees for AffineTransform
             rotationAngle = Math.toDegrees(angleToCoin);
         } else {
-            screenX = playerScreenX;
-            screenY = playerScreenY;
+            screenX = playerCenterX - width / 2;
+            screenY = playerCenterY - height / 2;
             rotationAngle = 0;
-            currentAlpha = 0.0f;
+            currentAlpha = MIN_ALPHA;
             disappearFX.setPosition(screenX, screenY);
         }
     }
@@ -111,6 +141,70 @@ public class ArrowSprite {
         }
         
         return nearest;
+    }
+
+    private float clampAlpha(float alpha) {
+        if (Float.isNaN(alpha) || Float.isInfinite(alpha)) {
+            return MIN_ALPHA;
+        }
+        return Math.max(MIN_ALPHA, Math.min(MAX_ALPHA, alpha));
+    }
+
+    private boolean hasVisibleCollectibleInSafeZone(ArrayList<Collectible> collectibles, int viewportWidth, int viewportHeight) {
+        if (collectibles == null || collectibles.isEmpty()) {
+            return false;
+        }
+
+        double safeZoneWidth = viewportWidth * VISIBLE_COIN_SAFE_ZONE_RATIO;
+        double safeZoneHeight = viewportHeight * VISIBLE_COIN_SAFE_ZONE_RATIO;
+        double safeZoneMinX = (viewportWidth - safeZoneWidth) / 2.0;
+        double safeZoneMaxX = safeZoneMinX + safeZoneWidth;
+        double safeZoneMinY = (viewportHeight - safeZoneHeight) / 2.0;
+        double safeZoneMaxY = safeZoneMinY + safeZoneHeight;
+
+        for (Collectible collectible : collectibles) {
+            if (collectible.isCollected()) {
+                continue;
+            }
+
+            double collectibleCenterX = collectible.getScreenX() + width / 2.0;
+            double collectibleCenterY = collectible.getScreenY() + height / 2.0;
+            if (collectibleCenterX >= safeZoneMinX && collectibleCenterX <= safeZoneMaxX
+                && collectibleCenterY >= safeZoneMinY && collectibleCenterY <= safeZoneMaxY) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private double getViewportBoundDistance(int playerCenterX, int playerCenterY, double directionX, double directionY,
+                                            int viewportWidth, int viewportHeight) {
+        double halfWidth = width / 2.0;
+        double halfHeight = height / 2.0;
+        double minX = EDGE_PADDING + halfWidth;
+        double maxX = Math.max(minX, viewportWidth - EDGE_PADDING - halfWidth);
+        double minY = EDGE_PADDING + halfHeight;
+        double maxY = Math.max(minY, viewportHeight - EDGE_PADDING - halfHeight);
+        double maxDistance = Double.POSITIVE_INFINITY;
+
+        if (directionX > 0.0001) {
+            maxDistance = Math.min(maxDistance, (maxX - playerCenterX) / directionX);
+        } else if (directionX < -0.0001) {
+            maxDistance = Math.min(maxDistance, (minX - playerCenterX) / directionX);
+        }
+
+        if (directionY > 0.0001) {
+            maxDistance = Math.min(maxDistance, (maxY - playerCenterY) / directionY);
+        } else if (directionY < -0.0001) {
+            maxDistance = Math.min(maxDistance, (minY - playerCenterY) / directionY);
+        }
+
+        if (!Double.isFinite(maxDistance) || maxDistance < 0) {
+            return 0;
+        }
+
+        return maxDistance;
     }
     
     /**
