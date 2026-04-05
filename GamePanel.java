@@ -31,6 +31,7 @@ public class GamePanel extends JPanel {
     private final GamePanelRenderer renderer;
     private final GameLoopMetrics loopMetrics;
     private final LevelUpManager levelUpManager;
+    private final Object stateLock;
 
     private BufferedImage doubleBufferImage;
     private Graphics2D doubleBufferG2;
@@ -68,6 +69,7 @@ public class GamePanel extends JPanel {
         renderer = new GamePanelRenderer(WORLD_WIDTH, WORLD_HEIGHT, GOLDEN_TINT_COLOR);
         loopMetrics = new GameLoopMetrics();
         levelUpManager = new LevelUpManager();
+        stateLock = new Object();
 
         setLayout(new BorderLayout());
         setBackground(Color.BLACK);
@@ -94,26 +96,30 @@ public class GamePanel extends JPanel {
     }
 
     public void createGameEntities() {
-        world.initializeEntities(this, TOTAL_COLLECTIBLES);
-        sessionState.setCollectedCount(0);
-        sessionState.setTotalCollectibles(world.getCollectibles().size());
+        synchronized (stateLock) {
+            world.initializeEntities(this, TOTAL_COLLECTIBLES);
+            sessionState.setCollectedCount(0);
+            sessionState.setTotalCollectibles(world.getCollectibles().size());
+        }
     }
 
     public void startGame() {
-        if (sessionState.isGameRunning()) {
-            return;
-        }
+        synchronized (stateLock) {
+            if (sessionState.isGameRunning()) {
+                return;
+            }
 
-        sessionState.resetForNewGame();
-        screenGrayScaleFX = null;
-        createGameEntities();
-        loopMetrics.reset();
-        levelUpManager.reset();
-        sessionState.setFps(0);
-        if (world.getPlayerData() != null) {
-            world.getPlayerData().setWeaponType(selectedWeapon);
+            sessionState.resetForNewGame();
+            screenGrayScaleFX = null;
+            createGameEntities();
+            loopMetrics.reset();
+            levelUpManager.reset();
+            sessionState.setFps(0);
+            if (world.getPlayerData() != null) {
+                world.getPlayerData().setWeaponType(selectedWeapon);
+            }
+            soundManager.playBackgroundMusic();
         }
-        soundManager.playBackgroundMusic();
         startGameThread();
     }
 
@@ -124,19 +130,23 @@ public class GamePanel extends JPanel {
     }
 
     public void pauseGame() {
-        sessionState.setGamePaused(!sessionState.isGamePaused());
+        synchronized (stateLock) {
+            sessionState.setGamePaused(!sessionState.isGamePaused());
 
-        if (sessionState.isGamePaused()) {
-            soundManager.stopClip("background");
-        } else {
-            soundManager.playBackgroundMusic();
+            if (sessionState.isGamePaused()) {
+                soundManager.stopClip("background");
+            } else {
+                soundManager.playBackgroundMusic();
+            }
         }
 
     }
 
     public void stopGame() {
-        sessionState.setGameRunning(false);
-        soundManager.stopClip("background");
+        synchronized (stateLock) {
+            sessionState.setGameRunning(false);
+            soundManager.stopClip("background");
+        }
         stopGameThread();
     }
 
@@ -149,7 +159,14 @@ public class GamePanel extends JPanel {
         gameLoopRunning = true;
         gameLoopThread = new Thread(() -> {
             while (gameLoopRunning) {
-                onGameTick();
+                try {
+                    onGameTick();
+                } catch (RuntimeException ex) {
+                    System.err.println("Game loop crashed:");
+                    ex.printStackTrace();
+                    gameLoopRunning = false;
+                    break;
+                }
                 try {
                     Thread.sleep(TIMER_POLL_DELAY_MS);
                 } catch (InterruptedException e) {
@@ -179,100 +196,98 @@ public class GamePanel extends JPanel {
     }
 
     private void onGameTick() {
-        loopMetrics.beginTimerTick();
+        synchronized (stateLock) {
+            loopMetrics.beginTimerTick();
 
-        if (sessionState.isGameRunning() && !sessionState.isGamePaused()) {
-            int updatesProcessed = 0;
-            boolean advancedFrame = false;
+            if (sessionState.isGameRunning() && !sessionState.isGamePaused()) {
+                int updatesProcessed = 0;
 
-            while (loopMetrics.getAccumulatedFrameNanos() >= TARGET_FRAME_NANOS && updatesProcessed < MAX_UPDATES_PER_TICK) {
-                long deltaTimeMs = Math.max(1L, Math.round(TARGET_FRAME_NANOS / 1_000_000.0));
-                long stageStartedAt = System.nanoTime();
-                updatePlayer(deltaTimeMs);
-                loopMetrics.recordPlayerUpdate(System.nanoTime() - stageStartedAt);
+                while (loopMetrics.getAccumulatedFrameNanos() >= TARGET_FRAME_NANOS && updatesProcessed < MAX_UPDATES_PER_TICK) {
+                    long deltaTimeMs = Math.max(1L, Math.round(TARGET_FRAME_NANOS / 1_000_000.0));
+                    long stageStartedAt = System.nanoTime();
+                    updatePlayer(deltaTimeMs);
+                    loopMetrics.recordPlayerUpdate(System.nanoTime() - stageStartedAt);
 
-                stageStartedAt = System.nanoTime();
-                combatSystem.updateEnemies(deltaTimeMs, world.getPlayer());
-                loopMetrics.recordEnemyUpdate(System.nanoTime() - stageStartedAt);
+                    stageStartedAt = System.nanoTime();
+                    combatSystem.updateEnemies(deltaTimeMs, world.getPlayer());
+                    loopMetrics.recordEnemyUpdate(System.nanoTime() - stageStartedAt);
 
-                stageStartedAt = System.nanoTime();
-                combatSystem.updateProjectiles(deltaTimeMs, world.getPlayer());
-                loopMetrics.recordProjectileUpdate(System.nanoTime() - stageStartedAt);
+                    stageStartedAt = System.nanoTime();
+                    combatSystem.updateProjectiles(deltaTimeMs, world.getPlayer());
+                    loopMetrics.recordProjectileUpdate(System.nanoTime() - stageStartedAt);
 
-                stageStartedAt = System.nanoTime();
-                world.updateWorldAnimations();
-                world.updateScreenPositions();
-                loopMetrics.recordAnimationUpdate(System.nanoTime() - stageStartedAt);
+                    stageStartedAt = System.nanoTime();
+                    world.updateWorldAnimations();
+                    world.updateScreenPositions();
+                    loopMetrics.recordAnimationUpdate(System.nanoTime() - stageStartedAt);
 
-                stageStartedAt = System.nanoTime();
-                combatSystem.checkCollisions(
-                    world.getPlayer(),
-                    world.getPlayerData(),
-                    this::queueLevelUpChoices,
-                    () -> triggerGameOver(false)
-                );
-                loopMetrics.recordCollisionUpdate(System.nanoTime() - stageStartedAt);
+                    stageStartedAt = System.nanoTime();
+                    combatSystem.checkCollisions(
+                        world.getPlayer(),
+                        world.getPlayerData(),
+                        this::queueLevelUpChoices,
+                        () -> triggerGameOver(false)
+                    );
+                    loopMetrics.recordCollisionUpdate(System.nanoTime() - stageStartedAt);
 
-                stageStartedAt = System.nanoTime();
-                updateEffects();
-                loopMetrics.recordEffectsUpdate(System.nanoTime() - stageStartedAt);
+                    stageStartedAt = System.nanoTime();
+                    updateEffects();
+                    loopMetrics.recordEffectsUpdate(System.nanoTime() - stageStartedAt);
 
-                loopMetrics.consumeFrame(TARGET_FRAME_NANOS);
-                updatesProcessed++;
-                advancedFrame = true;
+                    loopMetrics.consumeFrame(TARGET_FRAME_NANOS);
+                    updatesProcessed++;
+                }
+
+                if (updatesProcessed == MAX_UPDATES_PER_TICK && loopMetrics.getAccumulatedFrameNanos() > TARGET_FRAME_NANOS) {
+                    loopMetrics.clampAccumulatedFrameNanos(TARGET_FRAME_NANOS);
+                }
             }
 
-            if (updatesProcessed == MAX_UPDATES_PER_TICK && loopMetrics.getAccumulatedFrameNanos() > TARGET_FRAME_NANOS) {
-                loopMetrics.clampAccumulatedFrameNanos(TARGET_FRAME_NANOS);
+            levelUpManager.processPendingChoices(sessionState, world, inputState, soundManager);
+
+            if (sessionState.isGameOver() && sessionState.getGameOverTime() > 0) {
+                long elapsed = System.currentTimeMillis() - sessionState.getGameOverTime();
+                if (elapsed >= GAME_OVER_EXIT_DELAY) {
+                    System.exit(0);
+                }
             }
 
-            if (advancedFrame) {
-            }
+            loopMetrics.logProfilerIfReady(sessionState, world);
         }
-
-        levelUpManager.processPendingChoices(sessionState, world, inputState, soundManager);
-
-        if (sessionState.isGameOver() && sessionState.getGameOverTime() > 0) {
-            long elapsed = System.currentTimeMillis() - sessionState.getGameOverTime();
-            if (elapsed >= GAME_OVER_EXIT_DELAY) {
-                System.exit(0);
-            }
-        }
-
-        loopMetrics.logProfilerIfReady(sessionState, world);
     }
 
     public void triggerGameOver(boolean won) {
-        sessionState.setGameOver(true);
-        sessionState.setGameRunning(false);
-        soundManager.stopAll();
-        sessionState.setGameOverTime(System.currentTimeMillis());
-        sessionState.setGameExiting(false);
+        synchronized (stateLock) {
+            sessionState.setGameOver(true);
+            sessionState.setGameRunning(false);
+            soundManager.stopAll();
+            sessionState.setGameOverTime(System.currentTimeMillis());
+            sessionState.setGameExiting(false);
 
-        if (won) {
-            sessionState.setActiveEffectName("GrayScale");
-            if (world.getBackgroundImage() != null) {
-                BufferedImage backgroundImage = world.getBackgroundImage();
-                BufferedImage grayBg = new BufferedImage(backgroundImage.getWidth(), backgroundImage.getHeight(), BufferedImage.TYPE_INT_ARGB);
-                Graphics2D g2 = grayBg.createGraphics();
-                g2.drawImage(backgroundImage, 0, 0, null);
-                g2.dispose();
+            if (won) {
+                sessionState.setActiveEffectName("GrayScale");
+                if (world.getBackgroundImage() != null) {
+                    BufferedImage backgroundImage = world.getBackgroundImage();
+                    BufferedImage grayBg = new BufferedImage(backgroundImage.getWidth(), backgroundImage.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                    Graphics2D g2 = grayBg.createGraphics();
+                    g2.drawImage(backgroundImage, 0, 0, null);
+                    g2.dispose();
 
-                int[] pixels = new int[grayBg.getWidth() * grayBg.getHeight()];
-                grayBg.getRGB(0, 0, grayBg.getWidth(), grayBg.getHeight(), pixels, 0, grayBg.getWidth());
-                for (int i = 0; i < pixels.length; i++) {
-                    int alpha = (pixels[i] >> 24) & 255;
-                    int red = (pixels[i] >> 16) & 255;
-                    int green = (pixels[i] >> 8) & 255;
-                    int blue = pixels[i] & 255;
-                    int gray = (int) (0.299 * red + 0.587 * green + 0.114 * blue);
-                    pixels[i] = (alpha << 24) | (gray << 16) | (gray << 8) | gray;
+                    int[] pixels = new int[grayBg.getWidth() * grayBg.getHeight()];
+                    grayBg.getRGB(0, 0, grayBg.getWidth(), grayBg.getHeight(), pixels, 0, grayBg.getWidth());
+                    for (int i = 0; i < pixels.length; i++) {
+                        int alpha = (pixels[i] >> 24) & 255;
+                        int red = (pixels[i] >> 16) & 255;
+                        int green = (pixels[i] >> 8) & 255;
+                        int blue = pixels[i] & 255;
+                        int gray = (int) (0.299 * red + 0.587 * green + 0.114 * blue);
+                        pixels[i] = (alpha << 24) | (gray << 16) | (gray << 8) | gray;
+                    }
+                    grayBg.setRGB(0, 0, grayBg.getWidth(), grayBg.getHeight(), pixels, 0, grayBg.getWidth());
+                    screenGrayScaleFX = new GrayScaleFX(0, 0, WORLD_WIDTH, WORLD_HEIGHT, backgroundImage, grayBg);
                 }
-                grayBg.setRGB(0, 0, grayBg.getWidth(), grayBg.getHeight(), pixels, 0, grayBg.getWidth());
-                screenGrayScaleFX = new GrayScaleFX(0, 0, WORLD_WIDTH, WORLD_HEIGHT, backgroundImage, grayBg);
             }
         }
-
     }
 
     public void updatePlayer(long deltaTime) {
@@ -340,22 +355,24 @@ public class GamePanel extends JPanel {
     }
 
     public void renderToScreen(Graphics2D targetGraphics, int renderWidth, int renderHeight) {
-        if (sessionState.isGameOver() && sessionState.getGameOverTime() > 0 && !sessionState.isGameExiting()) {
-            long elapsed = System.currentTimeMillis() - sessionState.getGameOverTime();
-            if (elapsed >= GAME_OVER_EXIT_DELAY) {
-                sessionState.setGameExiting(true);
-                System.exit(0);
+        synchronized (stateLock) {
+            if (sessionState.isGameOver() && sessionState.getGameOverTime() > 0 && !sessionState.isGameExiting()) {
+                long elapsed = System.currentTimeMillis() - sessionState.getGameOverTime();
+                if (elapsed >= GAME_OVER_EXIT_DELAY) {
+                    sessionState.setGameExiting(true);
+                    System.exit(0);
+                }
             }
+
+            setViewportSize(renderWidth, renderHeight);
+            ensureRenderBuffer(renderWidth, renderHeight);
+
+            long drawStartedAt = System.nanoTime();
+            drawToBuffer(doubleBufferG2, renderWidth, renderHeight);
+            loopMetrics.recordDraw(System.nanoTime() - drawStartedAt);
+            targetGraphics.drawImage(doubleBufferImage, 0, 0, renderWidth, renderHeight, null);
+            loopMetrics.updateRenderedFps(sessionState);
         }
-
-        setViewportSize(renderWidth, renderHeight);
-        ensureRenderBuffer(renderWidth, renderHeight);
-
-        long drawStartedAt = System.nanoTime();
-        drawToBuffer(doubleBufferG2, renderWidth, renderHeight);
-        loopMetrics.recordDraw(System.nanoTime() - drawStartedAt);
-        targetGraphics.drawImage(doubleBufferImage, 0, 0, renderWidth, renderHeight, null);
-        loopMetrics.updateRenderedFps(sessionState);
     }
 
     private void drawToBuffer(Graphics2D g2, int renderWidth, int renderHeight) {
@@ -437,19 +454,23 @@ public class GamePanel extends JPanel {
     }
 
     public void setSelectedWeapon(WeaponType selectedWeapon) {
-        if (selectedWeapon == null) {
-            return;
-        }
+        synchronized (stateLock) {
+            if (selectedWeapon == null) {
+                return;
+            }
 
-        this.selectedWeapon = selectedWeapon;
-        if (world.getPlayerData() != null) {
-            world.getPlayerData().getWeapon().onUnequipped(world);
-            world.getPlayerData().setWeaponType(selectedWeapon);
+            this.selectedWeapon = selectedWeapon;
+            if (world.getPlayerData() != null) {
+                world.getPlayerData().getWeapon().onUnequipped(world);
+                world.getPlayerData().setWeaponType(selectedWeapon);
+            }
         }
     }
 
     public void setSelectedEnemyType(EnemySpawnType selectedEnemyType) {
-        world.getEnemySpawner().setSelectedEnemyType(selectedEnemyType);
+        synchronized (stateLock) {
+            world.getEnemySpawner().setSelectedEnemyType(selectedEnemyType);
+        }
     }
 
     public EnemySpawnType getSelectedEnemyType() {
@@ -469,7 +490,9 @@ public class GamePanel extends JPanel {
     }
 
     public void applyLevelUpChoice(int selectedIndex) {
-        levelUpManager.applyChoice(selectedIndex, sessionState, world, inputState, soundManager, infoPanel);
+        synchronized (stateLock) {
+            levelUpManager.applyChoice(selectedIndex, sessionState, world, inputState, soundManager, infoPanel);
+        }
     }
 
     private void queueLevelUpChoices(int levelsGained) {

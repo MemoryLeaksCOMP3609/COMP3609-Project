@@ -188,7 +188,14 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         renderRunning = true;
         renderThread = new Thread(() -> {
             while (renderRunning) {
-                renderScreen();
+                try {
+                    renderScreen();
+                } catch (RuntimeException ex) {
+                    System.err.println("Render loop crashed:");
+                    ex.printStackTrace();
+                    renderRunning = false;
+                    break;
+                }
                 try {
                     Thread.sleep(FRAME_DELAY_MS);
                 } catch (InterruptedException e) {
