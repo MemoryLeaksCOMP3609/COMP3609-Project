@@ -20,4 +20,14 @@ public class BossPhaseOneEnemy extends BossEnemy {
     protected double getDashTriggerDistance() {
         return 600.0;
     }
+
+    @Override
+    protected double getMaxDashDistance() {
+        return 750.0;
+    }
+
+    @Override
+    protected boolean shouldRunAwayOnDeath() {
+        return true;
+    }
 }

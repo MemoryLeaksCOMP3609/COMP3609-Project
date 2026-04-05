@@ -191,6 +191,10 @@ public class GameWorld {
     }
 
     public void spawnCrystalDrop(Enemy enemy) {
+        if (enemy instanceof BossEnemy) {
+            return;
+        }
+
         double roll = random.nextDouble();
         if (roll < DROP_NOTHING_CHANCE) {
             return;
