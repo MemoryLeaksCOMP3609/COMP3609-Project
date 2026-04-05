@@ -10,7 +10,6 @@ import java.util.Collections;
 import java.util.Iterator;
 
 public class GamePanel extends JPanel {
-    private static final int EMBEDDED_PIXEL_THRESHOLD = 12;
     private static final int MAX_PUSH_OUT_DISTANCE = 48;
     private static final int PANEL_WIDTH = 800;
     private static final int PANEL_HEIGHT = 600;
@@ -497,11 +496,9 @@ public class GamePanel extends JPanel {
         BufferedImage playerImage = player.getCurrentBufferedImage();
 
         for (SolidObject solid : world.getSolidObjects()) {
-            int overlapPixels = PixelCollision.countOverlappingPixels(playerBounds, playerImage,
-                solid.getBoundingRectangle(), solid.getImage(), EMBEDDED_PIXEL_THRESHOLD);
-            if (overlapPixels > 0) {
-                if (overlapPixels >= EMBEDDED_PIXEL_THRESHOLD
-                    && pushPlayerOutOfSolid(solid, moveDirection, fallbackX, fallbackY)) {
+            if (PixelCollision.intersects(playerBounds, playerImage,
+                solid.getBoundingRectangle(), solid.getImage())) {
+                if (pushPlayerOutOfSolid(solid, moveDirection, fallbackX, fallbackY)) {
                     return true;
                 }
                 return false;
