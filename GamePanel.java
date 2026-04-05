@@ -485,16 +485,6 @@ public class GamePanel extends JPanel {
         }
     }
 
-    public void setSelectedEnemyType(EnemySpawnType selectedEnemyType) {
-        synchronized (stateLock) {
-            world.getEnemySpawner().setSelectedEnemyType(selectedEnemyType);
-        }
-    }
-
-    public EnemySpawnType getSelectedEnemyType() {
-        return world.getEnemySpawner().getSelectedEnemyType();
-    }
-
     public boolean isLevelUpChoiceActive() {
         return levelUpManager.isChoiceActive();
     }
