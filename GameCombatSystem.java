@@ -5,6 +5,9 @@ import java.util.function.IntConsumer;
 public class GameCombatSystem {
     private static final int HEALTH_PER_CRYSTAL = 20;
     private static final long GHOST_CONTACT_COOLDOWN_MS = 500L;
+    private static final long BOSS_RANGED_ATTACK_COOLDOWN_MS = 1000L;
+    private static final double BOSS_RANGED_PROJECTILE_SCALE = 0.25;
+    private static final double BOSS_RANGED_SPAWN_OFFSET = 100.0;
 
     private final GameWorld world;
     private final GameSessionState sessionState;
@@ -56,7 +59,10 @@ public class GameCombatSystem {
                     updateBatEnemy(enemy, player, deltaTimeMs, distanceToPlayer);
                 }
             } else if (enemy instanceof BossEnemy) {
-                ((BossEnemy) enemy).updateBehavior(player, deltaTimeMs);
+                BossEnemy boss = (BossEnemy) enemy;
+                boss.updateRangedAttackCooldown(deltaTimeMs);
+                boss.updateBehavior(player, deltaTimeMs);
+                updateBossRangedAttack(boss, player);
             } else if (enemy instanceof SkeletonEnemy) {
                 ((SkeletonEnemy) enemy).updateBehavior(player, deltaTimeMs);
             } else if (enemy instanceof GhostEnemy) {
@@ -84,6 +90,39 @@ public class GameCombatSystem {
                 WeaponType.FIRE_ARROW, Projectile.MotionMode.STRAIGHT));
             enemy.setAttackCooldown(batFireIntervalMs);
         }
+    }
+
+    private void updateBossRangedAttack(BossEnemy boss, PlayerSprite player) {
+        if (!boss.isAlive() || !boss.supportsRangedAttack() || boss.isBusyWithMeleeAttack() || !boss.canUseRangedAttack()) {
+            return;
+        }
+
+        int startX = boss.getCenterX();
+        int startY = boss.getCenterY();
+        int targetX = player.getCenterX();
+        int targetY = player.getCenterY();
+        double deltaX = targetX - startX;
+        double deltaY = targetY - startY;
+        double distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        if (distance > 0.001) {
+            startX += (int) Math.round((deltaX / distance) * BOSS_RANGED_SPAWN_OFFSET);
+            startY += (int) Math.round((deltaY / distance) * BOSS_RANGED_SPAWN_OFFSET);
+        }
+
+        world.getProjectiles().add(createProjectile(
+            startX,
+            startY,
+            targetX,
+            targetY,
+            batBulletSpeed,
+            boss.getContactDamage(),
+            true,
+            "images/spells/waterArrow",
+            BOSS_RANGED_PROJECTILE_SCALE,
+            WeaponType.FIRE_ARROW,
+            Projectile.MotionMode.STRAIGHT
+        ));
+        boss.setRangedAttackCooldown(BOSS_RANGED_ATTACK_COOLDOWN_MS);
     }
 
     public void updateProjectiles(long deltaTimeMs, PlayerSprite player) {

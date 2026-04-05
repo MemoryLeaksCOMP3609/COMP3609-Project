@@ -27,6 +27,11 @@ public class BossPhaseTwoEnemy extends BossEnemy {
     }
 
     @Override
+    protected boolean supportsRangedAttack() {
+        return true;
+    }
+
+    @Override
     protected boolean shouldRunAwayOnDeath() {
         return true;
     }

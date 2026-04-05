@@ -14,6 +14,7 @@ public abstract class BossEnemy extends Enemy {
     private long attackAnimationRemainingMs;
     private boolean attackDamagePending;
     private double dashDistanceRemaining;
+    private long rangedAttackCooldownMs;
     private String deathAnimationPath;
     private long deathAnimationFrameDurationMs;
     private long deathElapsedMs;
@@ -33,6 +34,7 @@ public abstract class BossEnemy extends Enemy {
         this.attackAnimationRemainingMs = 0L;
         this.attackDamagePending = false;
         this.dashDistanceRemaining = 0.0;
+        this.rangedAttackCooldownMs = 0L;
         this.deathAnimationPath = null;
         this.deathAnimationFrameDurationMs = 0L;
         this.deathElapsedMs = 0L;
@@ -115,6 +117,22 @@ public abstract class BossEnemy extends Enemy {
             && attackSequenceAnimation != null
             && attackSequenceAnimation.getFrameCount() >= 3
             && attackSequenceAnimation.getCurrentFrameIndex() == 2;
+    }
+
+    public void updateRangedAttackCooldown(long deltaTimeMs) {
+        rangedAttackCooldownMs = Math.max(0L, rangedAttackCooldownMs - deltaTimeMs);
+    }
+
+    public boolean canUseRangedAttack() {
+        return rangedAttackCooldownMs <= 0L;
+    }
+
+    public void setRangedAttackCooldown(long cooldownMs) {
+        rangedAttackCooldownMs = cooldownMs;
+    }
+
+    public boolean isBusyWithMeleeAttack() {
+        return dashActive || attackAnimationRemainingMs > 0L;
     }
 
     protected void loadBossAnimations(String movePath, String attackPath, String deathPath, long frameDuration) {
@@ -265,6 +283,10 @@ public abstract class BossEnemy extends Enemy {
     protected abstract double getDashTriggerDistance();
 
     protected abstract double getMaxDashDistance();
+
+    protected boolean supportsRangedAttack() {
+        return false;
+    }
 
     protected boolean shouldRunAwayOnDeath() {
         return false;
