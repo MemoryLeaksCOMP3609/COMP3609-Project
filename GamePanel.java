@@ -1,11 +1,8 @@
 import javax.swing.JPanel;
-import javax.swing.JOptionPane;
-import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
-import java.util.Collections;
 
 public class GamePanel extends JPanel {
     private static final int PANEL_WIDTH = 800;
@@ -32,6 +29,8 @@ public class GamePanel extends JPanel {
     private final PlayerCollisionResolver playerCollisionResolver;
     private final GameCombatSystem combatSystem;
     private final GamePanelRenderer renderer;
+    private final GameLoopMetrics loopMetrics;
+    private final LevelUpManager levelUpManager;
 
     private BufferedImage doubleBufferImage;
     private Graphics2D doubleBufferG2;
@@ -42,23 +41,6 @@ public class GamePanel extends JPanel {
     private InfoPanel infoPanel;
     private Timer gameLoopTimer;
     private WeaponType selectedWeapon;
-    private long lastFrameTimeNanos;
-    private long lastFpsSampleNanos;
-    private long lastHudUpdateNanos;
-    private long lastProfilerSampleNanos;
-    private long accumulatedFrameNanos;
-    private int renderedFramesSinceSample;
-    private long totalPlayerUpdateNanos;
-    private long totalEnemyUpdateNanos;
-    private long totalProjectileUpdateNanos;
-    private long totalAnimationUpdateNanos;
-    private long totalCollisionNanos;
-    private long totalEffectsUpdateNanos;
-    private long totalDrawNanos;
-    private int profiledUpdateCount;
-    private int profiledDrawCount;
-    private int pendingLevelUpChoices;
-    private boolean levelUpDialogOpen;
 
     public GamePanel() {
         this(null);
@@ -81,6 +63,8 @@ public class GamePanel extends JPanel {
             BAT_BULLET_SPEED
         );
         renderer = new GamePanelRenderer(WORLD_WIDTH, WORLD_HEIGHT, GOLDEN_TINT_COLOR);
+        loopMetrics = new GameLoopMetrics();
+        levelUpManager = new LevelUpManager();
 
         setBackground(Color.BLACK);
         setPreferredSize(new Dimension(PANEL_WIDTH, PANEL_HEIGHT));
@@ -100,23 +84,6 @@ public class GamePanel extends JPanel {
 
         gameLoopTimer = null;
         selectedWeapon = WeaponType.FIRE_ARROW;
-        lastFrameTimeNanos = System.nanoTime();
-        lastFpsSampleNanos = System.nanoTime();
-        lastHudUpdateNanos = System.nanoTime();
-        lastProfilerSampleNanos = System.nanoTime();
-        accumulatedFrameNanos = 0L;
-        renderedFramesSinceSample = 0;
-        totalPlayerUpdateNanos = 0L;
-        totalEnemyUpdateNanos = 0L;
-        totalProjectileUpdateNanos = 0L;
-        totalAnimationUpdateNanos = 0L;
-        totalCollisionNanos = 0L;
-        totalEffectsUpdateNanos = 0L;
-        totalDrawNanos = 0L;
-        profiledUpdateCount = 0;
-        profiledDrawCount = 0;
-        pendingLevelUpChoices = 0;
-        levelUpDialogOpen = false;
     }
 
     public void createGameEntities() {
@@ -133,23 +100,8 @@ public class GamePanel extends JPanel {
         sessionState.resetForNewGame();
         screenGrayScaleFX = null;
         createGameEntities();
-        lastFrameTimeNanos = System.nanoTime();
-        lastFpsSampleNanos = System.nanoTime();
-        lastHudUpdateNanos = System.nanoTime();
-        lastProfilerSampleNanos = System.nanoTime();
-        accumulatedFrameNanos = 0L;
-        renderedFramesSinceSample = 0;
-        totalPlayerUpdateNanos = 0L;
-        totalEnemyUpdateNanos = 0L;
-        totalProjectileUpdateNanos = 0L;
-        totalAnimationUpdateNanos = 0L;
-        totalCollisionNanos = 0L;
-        totalEffectsUpdateNanos = 0L;
-        totalDrawNanos = 0L;
-        profiledUpdateCount = 0;
-        profiledDrawCount = 0;
-        pendingLevelUpChoices = 0;
-        levelUpDialogOpen = false;
+        loopMetrics.reset();
+        levelUpManager.reset();
         sessionState.setFps(0);
         if (world.getPlayerData() != null) {
             world.getPlayerData().setWeaponType(selectedWeapon);
@@ -186,8 +138,7 @@ public class GamePanel extends JPanel {
             return;
         }
 
-        lastFrameTimeNanos = System.nanoTime();
-        accumulatedFrameNanos = 0L;
+        loopMetrics.reset();
         gameLoopTimer = new Timer(TIMER_POLL_DELAY_MS, event -> onGameTick());
         gameLoopTimer.setCoalesce(false);
         gameLoopTimer.start();
@@ -201,33 +152,30 @@ public class GamePanel extends JPanel {
     }
 
     private void onGameTick() {
-        long currentTimeNanos = System.nanoTime();
-        long elapsedNanos = currentTimeNanos - lastFrameTimeNanos;
-        lastFrameTimeNanos = currentTimeNanos;
-        accumulatedFrameNanos += elapsedNanos;
+        loopMetrics.beginTimerTick();
 
         if (sessionState.isGameRunning() && !sessionState.isGamePaused()) {
             int updatesProcessed = 0;
             boolean advancedFrame = false;
 
-            while (accumulatedFrameNanos >= TARGET_FRAME_NANOS && updatesProcessed < MAX_UPDATES_PER_TICK) {
+            while (loopMetrics.getAccumulatedFrameNanos() >= TARGET_FRAME_NANOS && updatesProcessed < MAX_UPDATES_PER_TICK) {
                 long deltaTimeMs = Math.max(1L, Math.round(TARGET_FRAME_NANOS / 1_000_000.0));
                 long stageStartedAt = System.nanoTime();
                 updatePlayer(deltaTimeMs);
-                totalPlayerUpdateNanos += System.nanoTime() - stageStartedAt;
+                loopMetrics.recordPlayerUpdate(System.nanoTime() - stageStartedAt);
 
                 stageStartedAt = System.nanoTime();
                 combatSystem.updateEnemies(deltaTimeMs, world.getPlayer());
-                totalEnemyUpdateNanos += System.nanoTime() - stageStartedAt;
+                loopMetrics.recordEnemyUpdate(System.nanoTime() - stageStartedAt);
 
                 stageStartedAt = System.nanoTime();
                 combatSystem.updateProjectiles(deltaTimeMs, world.getPlayer());
-                totalProjectileUpdateNanos += System.nanoTime() - stageStartedAt;
+                loopMetrics.recordProjectileUpdate(System.nanoTime() - stageStartedAt);
 
                 stageStartedAt = System.nanoTime();
                 world.updateWorldAnimations();
                 world.updateScreenPositions();
-                totalAnimationUpdateNanos += System.nanoTime() - stageStartedAt;
+                loopMetrics.recordAnimationUpdate(System.nanoTime() - stageStartedAt);
 
                 stageStartedAt = System.nanoTime();
                 combatSystem.checkCollisions(
@@ -236,20 +184,19 @@ public class GamePanel extends JPanel {
                     this::queueLevelUpChoices,
                     () -> triggerGameOver(false)
                 );
-                totalCollisionNanos += System.nanoTime() - stageStartedAt;
+                loopMetrics.recordCollisionUpdate(System.nanoTime() - stageStartedAt);
 
                 stageStartedAt = System.nanoTime();
                 updateEffects();
-                totalEffectsUpdateNanos += System.nanoTime() - stageStartedAt;
+                loopMetrics.recordEffectsUpdate(System.nanoTime() - stageStartedAt);
 
-                accumulatedFrameNanos -= TARGET_FRAME_NANOS;
+                loopMetrics.consumeFrame(TARGET_FRAME_NANOS);
                 updatesProcessed++;
                 advancedFrame = true;
-                profiledUpdateCount++;
             }
 
-            if (updatesProcessed == MAX_UPDATES_PER_TICK && accumulatedFrameNanos > TARGET_FRAME_NANOS) {
-                accumulatedFrameNanos = TARGET_FRAME_NANOS;
+            if (updatesProcessed == MAX_UPDATES_PER_TICK && loopMetrics.getAccumulatedFrameNanos() > TARGET_FRAME_NANOS) {
+                loopMetrics.clampAccumulatedFrameNanos(TARGET_FRAME_NANOS);
             }
 
             if (advancedFrame) {
@@ -257,7 +204,7 @@ public class GamePanel extends JPanel {
             }
         }
 
-        processPendingLevelUpChoices();
+        levelUpManager.processPendingChoices(this, sessionState, world, inputState, soundManager, infoPanel);
 
         if (sessionState.isGameOver() && sessionState.getGameOverTime() > 0) {
             long elapsed = System.currentTimeMillis() - sessionState.getGameOverTime();
@@ -266,7 +213,7 @@ public class GamePanel extends JPanel {
             }
         }
 
-        logFrameProfilerIfReady();
+        loopMetrics.logProfilerIfReady(sessionState, world);
     }
 
     public void triggerGameOver(boolean won) {
@@ -364,13 +311,7 @@ public class GamePanel extends JPanel {
             screenGrayScaleFX.update();
         }
 
-        long now = System.nanoTime();
-        if (infoPanel != null && now - lastHudUpdateNanos >= 100_000_000L) {
-            infoPanel.updatePlayerStats(world.getPlayerData());
-            infoPanel.updateFPS(sessionState.getFps());
-            infoPanel.updateActiveEffects(sessionState.getActiveEffectName());
-            lastHudUpdateNanos = now;
-        }
+        loopMetrics.updateHudIfReady(infoPanel, world.getPlayerData(), sessionState);
     }
 
     @Override
@@ -388,78 +329,18 @@ public class GamePanel extends JPanel {
         if (doubleBufferImage != null) {
             long drawStartedAt = System.nanoTime();
             drawToBuffer(doubleBufferG2);
-            totalDrawNanos += System.nanoTime() - drawStartedAt;
-            profiledDrawCount++;
+            loopMetrics.recordDraw(System.nanoTime() - drawStartedAt);
             g.drawImage(doubleBufferImage, 0, 0, null);
         } else {
             long drawStartedAt = System.nanoTime();
             drawToBuffer((Graphics2D) g);
-            totalDrawNanos += System.nanoTime() - drawStartedAt;
-            profiledDrawCount++;
+            loopMetrics.recordDraw(System.nanoTime() - drawStartedAt);
         }
-        updateRenderedFps();
+        loopMetrics.updateRenderedFps(sessionState);
     }
 
     private void drawToBuffer(Graphics2D g2) {
         renderer.draw(g2, getWidth(), getHeight(), world, sessionState, effects, screenGrayScaleFX, doubleBufferImage);
-    }
-
-    private void updateRenderedFps() {
-        renderedFramesSinceSample++;
-        long now = System.nanoTime();
-        long elapsedNanos = now - lastFpsSampleNanos;
-        if (elapsedNanos >= 1_000_000_000L) {
-            int fps = (int) Math.round(renderedFramesSinceSample * (1_000_000_000.0 / elapsedNanos));
-            sessionState.setFps(fps);
-            renderedFramesSinceSample = 0;
-            lastFpsSampleNanos = now;
-        }
-    }
-
-    private void logFrameProfilerIfReady() {
-        long now = System.nanoTime();
-        long elapsedNanos = now - lastProfilerSampleNanos;
-        if (elapsedNanos < 1_000_000_000L) {
-            return;
-        }
-
-        double updateCount = Math.max(1, profiledUpdateCount);
-        double drawCount = Math.max(1, profiledDrawCount);
-        double playerMs = totalPlayerUpdateNanos / 1_000_000.0 / updateCount;
-        double enemiesMs = totalEnemyUpdateNanos / 1_000_000.0 / updateCount;
-        double projectilesMs = totalProjectileUpdateNanos / 1_000_000.0 / updateCount;
-        double animationsMs = totalAnimationUpdateNanos / 1_000_000.0 / updateCount;
-        double collisionsMs = totalCollisionNanos / 1_000_000.0 / updateCount;
-        double effectsMs = totalEffectsUpdateNanos / 1_000_000.0 / updateCount;
-        double drawMs = totalDrawNanos / 1_000_000.0 / drawCount;
-
-        System.out.printf(
-            "Frame profile: fps=%d updates=%d draws=%d player=%.2fms enemies=%.2fms projectiles=%.2fms anim=%.2fms collisions=%.2fms effects=%.2fms draw=%.2fms enemiesAlive=%d projectilesLive=%d crystals=%d%n",
-            sessionState.getFps(),
-            profiledUpdateCount,
-            profiledDrawCount,
-            playerMs,
-            enemiesMs,
-            projectilesMs,
-            animationsMs,
-            collisionsMs,
-            effectsMs,
-            drawMs,
-            world.getEnemies().size(),
-            world.getProjectiles().size(),
-            world.getDroppedCrystals().size()
-        );
-
-        lastProfilerSampleNanos = now;
-        totalPlayerUpdateNanos = 0L;
-        totalEnemyUpdateNanos = 0L;
-        totalProjectileUpdateNanos = 0L;
-        totalAnimationUpdateNanos = 0L;
-        totalCollisionNanos = 0L;
-        totalEffectsUpdateNanos = 0L;
-        totalDrawNanos = 0L;
-        profiledUpdateCount = 0;
-        profiledDrawCount = 0;
     }
 
     public void setLeftKeyPressed(boolean pressed) {
@@ -527,94 +408,7 @@ public class GamePanel extends JPanel {
     }
 
     private void queueLevelUpChoices(int levelsGained) {
-        if (levelsGained <= 0) {
-            return;
-        }
-
-        pendingLevelUpChoices += levelsGained;
-        sessionState.setActiveEffectName("Level Up");
-    }
-
-    private void processPendingLevelUpChoices() {
-        if (pendingLevelUpChoices <= 0 || levelUpDialogOpen || !sessionState.isGameRunning() || sessionState.isGameOver()) {
-            return;
-        }
-
-        Player playerData = world.getPlayerData();
-        if (playerData == null) {
-            pendingLevelUpChoices = 0;
-            return;
-        }
-
-        levelUpDialogOpen = true;
-        boolean wasPaused = sessionState.isGamePaused();
-        sessionState.setGamePaused(true);
-        soundManager.stopClip("background");
-
-        try {
-            while (pendingLevelUpChoices > 0 && sessionState.isGameRunning() && !sessionState.isGameOver()) {
-                PlayerUpgradeOption selectedUpgrade = promptForLevelUpChoice(playerData);
-                if (selectedUpgrade == null) {
-                    continue;
-                }
-
-                selectedUpgrade.apply(playerData);
-                pendingLevelUpChoices--;
-                sessionState.setActiveEffectName(selectedUpgrade.getDisplayName());
-                if (infoPanel != null) {
-                    infoPanel.updatePlayerStats(playerData);
-                }
-            }
-        } finally {
-            levelUpDialogOpen = false;
-            inputState.clearMovement();
-            if (world.getPlayer() != null) {
-                world.getPlayer().setIdle();
-            }
-            sessionState.setGamePaused(wasPaused);
-            if (!sessionState.isGameOver() && sessionState.isGameRunning() && !sessionState.isGamePaused()) {
-                soundManager.playBackgroundMusic();
-            }
-            requestFocusInWindow();
-        }
-    }
-
-    private PlayerUpgradeOption promptForLevelUpChoice(Player playerData) {
-        ArrayList<PlayerUpgradeOption> choices = new ArrayList<PlayerUpgradeOption>();
-        for (PlayerUpgradeOption option : PlayerUpgradeOption.values()) {
-            if (option.isAvailable(playerData)) {
-                choices.add(option);
-            }
-        }
-        Collections.shuffle(choices);
-
-        int choiceCount = Math.min(3, choices.size());
-        String[] labels = new String[choiceCount];
-        for (int i = 0; i < choiceCount; i++) {
-            labels[i] = choices.get(i).getDisplayName();
-        }
-
-        String title = "Level Up";
-        String message = playerData.isMaxLevel()
-            ? "You reached the max level."
-            : "Level " + playerData.getLevel() + " - choose a stat to upgrade";
-
-        while (true) {
-            int selectedIndex = JOptionPane.showOptionDialog(
-                SwingUtilities.getWindowAncestor(this),
-                message,
-                title,
-                JOptionPane.DEFAULT_OPTION,
-                JOptionPane.PLAIN_MESSAGE,
-                null,
-                labels,
-                labels[0]
-            );
-
-            if (selectedIndex >= 0 && selectedIndex < choiceCount) {
-                return choices.get(selectedIndex);
-            }
-        }
+        levelUpManager.queueChoices(levelsGained, sessionState);
     }
 
 }
