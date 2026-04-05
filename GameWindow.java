@@ -30,8 +30,6 @@ import javax.swing.JPanel;
 
 public class GameWindow extends JFrame implements ActionListener, KeyListener, MouseListener, MouseMotionListener {
     private static final int NUM_BUFFERS = 2;
-    private static final int TARGET_FPS = 60;
-    private static final int FRAME_DELAY_MS = 1000 / TARGET_FPS;
     private static final Dimension LAUNCHER_SIZE = new Dimension(900, 650);
     private static final int BUTTON_WIDTH = 120;
     private static final int BUTTON_HEIGHT = 42;
@@ -49,10 +47,16 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
     private BufferedImage screenImage;
     private boolean fullscreenActive;
     private boolean weaponSelectionActive;
+    private boolean exitConfirmationActive;
+    private boolean exitConfirmationPausedGame;
     private Rectangle pauseButtonBounds;
     private Rectangle exitButtonBounds;
+    private Rectangle exitConfirmButtonBounds;
+    private Rectangle exitCancelButtonBounds;
     private boolean mouseOverPauseButton;
     private boolean mouseOverExitButton;
+    private boolean mouseOverExitConfirmButton;
+    private boolean mouseOverExitCancelButton;
     private Rectangle[] weaponOptionBounds;
     private Rectangle[] levelUpOptionBounds;
     private final WeaponType[] weaponOptions;
@@ -67,6 +71,8 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         gamePanel = new GamePanel(infoPanel);
         fullscreenActive = false;
         weaponSelectionActive = false;
+        exitConfirmationActive = false;
+        exitConfirmationPausedGame = false;
         weaponOptions = WeaponType.values();
         weaponOptionBounds = new Rectangle[weaponOptions.length];
         weaponOptionHovered = new boolean[weaponOptions.length];
@@ -204,6 +210,7 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
                     drawOverlayButtons(imageGraphics);
                     drawWeaponSelectionOverlay(imageGraphics, width, height);
                     drawLevelUpOverlay(imageGraphics, width, height);
+                    drawExitConfirmationOverlay(imageGraphics, width, height);
                 } finally {
                     imageGraphics.dispose();
                 }
@@ -228,7 +235,15 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         int keyCode = e.getKeyCode();
 
         if (keyCode == KeyEvent.VK_ESCAPE) {
-            closeApplication();
+            if (fullscreenActive) {
+                if (exitConfirmationActive) {
+                    hideExitConfirmation();
+                } else {
+                    showExitConfirmation();
+                }
+            } else {
+                closeApplication();
+            }
             return;
         }
 
@@ -236,7 +251,7 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
             return;
         }
 
-        if (weaponSelectionActive || gamePanel.isLevelUpChoiceActive()) {
+        if (exitConfirmationActive || weaponSelectionActive || gamePanel.isLevelUpChoiceActive()) {
             return;
         }
 
@@ -296,6 +311,18 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         int mouseX = e.getX();
         int mouseY = e.getY();
 
+        if (exitConfirmationActive) {
+            if (exitConfirmButtonBounds != null && exitConfirmButtonBounds.contains(mouseX, mouseY)) {
+                closeApplication();
+                return;
+            }
+
+            if (exitCancelButtonBounds != null && exitCancelButtonBounds.contains(mouseX, mouseY)) {
+                hideExitConfirmation();
+            }
+            return;
+        }
+
         if (weaponSelectionActive) {
             handleWeaponSelectionClick(mouseX, mouseY);
             return;
@@ -312,7 +339,7 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         }
 
         if (exitButtonBounds != null && exitButtonBounds.contains(mouseX, mouseY)) {
-            closeApplication();
+            showExitConfirmation();
         }
     }
 
@@ -328,6 +355,8 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
     public void mouseExited(MouseEvent e) {
         mouseOverPauseButton = false;
         mouseOverExitButton = false;
+        mouseOverExitConfirmButton = false;
+        mouseOverExitCancelButton = false;
         clearChoiceHoverStates();
     }
 
@@ -346,6 +375,8 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         int mouseY = e.getY();
         mouseOverPauseButton = pauseButtonBounds != null && pauseButtonBounds.contains(mouseX, mouseY);
         mouseOverExitButton = exitButtonBounds != null && exitButtonBounds.contains(mouseX, mouseY);
+        mouseOverExitConfirmButton = exitConfirmButtonBounds != null && exitConfirmButtonBounds.contains(mouseX, mouseY);
+        mouseOverExitCancelButton = exitCancelButtonBounds != null && exitCancelButtonBounds.contains(mouseX, mouseY);
         updateChoiceHoverStates(mouseX, mouseY);
     }
 
@@ -374,7 +405,7 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
     }
 
     private void drawOverlayButtons(Graphics2D g2) {
-        if (weaponSelectionActive || gamePanel.isLevelUpChoiceActive()) {
+        if (weaponSelectionActive || gamePanel.isLevelUpChoiceActive() || exitConfirmationActive) {
             return;
         }
 
@@ -476,6 +507,40 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         }
     }
 
+    private void drawExitConfirmationOverlay(Graphics2D g2, int screenWidth, int screenHeight) {
+        if (!exitConfirmationActive) {
+            return;
+        }
+
+        drawModalBackdrop(g2, screenWidth, screenHeight);
+
+        int dialogWidth = Math.min(460, screenWidth - 80);
+        int dialogHeight = 220;
+        int dialogX = (screenWidth - dialogWidth) / 2;
+        int dialogY = (screenHeight - dialogHeight) / 2;
+
+        g2.setColor(new Color(18, 18, 18, 240));
+        g2.fillRoundRect(dialogX, dialogY, dialogWidth, dialogHeight, 28, 28);
+        g2.setColor(Color.WHITE);
+        g2.drawRoundRect(dialogX, dialogY, dialogWidth, dialogHeight, 28, 28);
+
+        drawCenteredTitle(g2, "Exit Game?", screenWidth, dialogY + 62, 32);
+        drawCenteredSubtitle(g2, "Are you sure you want to leave the game?", screenWidth, dialogY + 102);
+
+        int buttonWidth = 150;
+        int buttonHeight = 48;
+        int buttonGap = 20;
+        int totalButtonWidth = (buttonWidth * 2) + buttonGap;
+        int buttonStartX = (screenWidth - totalButtonWidth) / 2;
+        int buttonY = dialogY + 140;
+
+        exitConfirmButtonBounds = new Rectangle(buttonStartX, buttonY, buttonWidth, buttonHeight);
+        exitCancelButtonBounds = new Rectangle(buttonStartX + buttonWidth + buttonGap, buttonY, buttonWidth, buttonHeight);
+
+        drawChoiceButton(g2, exitConfirmButtonBounds, "Yes, Exit", mouseOverExitConfirmButton);
+        drawChoiceButton(g2, exitCancelButtonBounds, "No, Stay", mouseOverExitCancelButton);
+    }
+
     private void drawModalBackdrop(Graphics2D g2, int screenWidth, int screenHeight) {
         g2.setColor(new Color(0, 0, 0, 190));
         g2.fillRect(0, 0, screenWidth, screenHeight);
@@ -542,6 +607,16 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
     }
 
     private void updateChoiceHoverStates(int mouseX, int mouseY) {
+        if (exitConfirmationActive) {
+            for (int i = 0; i < weaponOptionHovered.length; i++) {
+                weaponOptionHovered[i] = false;
+            }
+            for (int i = 0; i < levelUpOptionHovered.length; i++) {
+                levelUpOptionHovered[i] = false;
+            }
+            return;
+        }
+
         if (weaponSelectionActive) {
             for (int i = 0; i < weaponOptionBounds.length; i++) {
                 weaponOptionHovered[i] = weaponOptionBounds[i] != null && weaponOptionBounds[i].contains(mouseX, mouseY);
@@ -576,7 +651,36 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         }
     }
 
+    private void showExitConfirmation() {
+        exitConfirmationActive = true;
+        mouseOverExitConfirmButton = false;
+        mouseOverExitCancelButton = false;
+        clearChoiceHoverStates();
+
+        if (gamePanel.isGameRunning() && !gamePanel.isGamePaused() && !gamePanel.isGameOver()) {
+            gamePanel.pauseGame();
+            exitConfirmationPausedGame = true;
+        } else {
+            exitConfirmationPausedGame = false;
+        }
+    }
+
+    private void hideExitConfirmation() {
+        exitConfirmationActive = false;
+        exitConfirmButtonBounds = null;
+        exitCancelButtonBounds = null;
+        mouseOverExitConfirmButton = false;
+        mouseOverExitCancelButton = false;
+
+        if (exitConfirmationPausedGame) {
+            gamePanel.pauseGame();
+            exitConfirmationPausedGame = false;
+        }
+    }
+
     private void closeApplication() {
+        exitConfirmationActive = false;
+        exitConfirmationPausedGame = false;
         gamePanel.setRenderCallback(null);
         gamePanel.stopGame();
 

@@ -165,8 +165,6 @@ public class PlayerSprite extends Sprite {
     }
     
     public void move(int direction, long deltaTimeMs) {
-        if (!panel.isVisible()) return;
-        
         Animation animationToPlay = null;
         double moveDistance = getCurrentMoveSpeed() * (deltaTimeMs / MOVEMENT_REFERENCE_FRAME_MS);
         

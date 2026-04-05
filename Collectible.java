@@ -45,18 +45,13 @@ public class Collectible {
     
     public void draw(Graphics2D g2) {
         if (collected) return;
-        
-        // Only draw if visible on screen
-        if (screenX + width > 0 && screenX < 800 &&
-            screenY + height > 0 && screenY < 600) {
-            
-            if (animatedSprite != null) {
-                animatedSprite.draw(g2);
-            } else {
-                // Draw placeholder
-                g2.setColor(java.awt.Color.YELLOW);
-                g2.fillOval(screenX, screenY, width, height);
-            }
+
+        if (animatedSprite != null) {
+            animatedSprite.draw(g2);
+        } else {
+            // Draw placeholder
+            g2.setColor(java.awt.Color.YELLOW);
+            g2.fillOval(screenX, screenY, width, height);
         }
     }
     
