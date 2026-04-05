@@ -13,6 +13,7 @@ public class EnemySpawner {
     private final Random random;
     private EnemySpawnType selectedEnemyType;
     private long spawnCooldownRemaining;
+    private boolean bossSpawnConsumed;
 
     public EnemySpawner(int worldWidth, int worldHeight) {
         this.worldWidth = worldWidth;
@@ -20,10 +21,12 @@ public class EnemySpawner {
         this.random = new Random();
         this.selectedEnemyType = EnemySpawnType.BAT;
         this.spawnCooldownRemaining = 0;
+        this.bossSpawnConsumed = false;
     }
 
     public void reset() {
         spawnCooldownRemaining = 0;
+        bossSpawnConsumed = false;
     }
 
     public void update(long deltaTimeMs, PlayerSprite player, ArrayList<Enemy> enemies) {
@@ -35,6 +38,10 @@ public class EnemySpawner {
             spawnCooldownRemaining = Math.max(0, spawnCooldownRemaining - deltaTimeMs);
         }
 
+        if (isBossSelection() && bossSpawnConsumed) {
+            return;
+        }
+
         int maxActiveSelectedEnemies = isBossSelection() ? MAX_ACTIVE_SELECTED_BOSSES : MAX_ACTIVE_SELECTED_ENEMIES;
         if (countLivingEnemiesOfSelectedType(enemies) >= maxActiveSelectedEnemies || spawnCooldownRemaining > 0) {
             return;
@@ -42,6 +49,9 @@ public class EnemySpawner {
 
         enemies.add(spawnEnemyNearPlayer(player));
         spawnCooldownRemaining = SPAWN_COOLDOWN_MS;
+        if (isBossSelection()) {
+            bossSpawnConsumed = true;
+        }
     }
 
     public void setSelectedEnemyType(EnemySpawnType selectedEnemyType) {
@@ -51,6 +61,7 @@ public class EnemySpawner {
 
         this.selectedEnemyType = selectedEnemyType;
         spawnCooldownRemaining = 0;
+        bossSpawnConsumed = false;
     }
 
     public EnemySpawnType getSelectedEnemyType() {

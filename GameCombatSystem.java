@@ -1,4 +1,5 @@
 import java.awt.geom.Rectangle2D;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.function.IntConsumer;
 
@@ -39,6 +40,7 @@ public class GameCombatSystem {
 
         world.getEnemySpawner().update(deltaTimeMs, player, world.getEnemies());
 
+        ArrayList<Enemy> removedEnemies = new ArrayList<Enemy>();
         Iterator<Enemy> enemyIterator = world.getEnemies().iterator();
         while (enemyIterator.hasNext()) {
             Enemy enemy = enemyIterator.next();
@@ -46,6 +48,7 @@ public class GameCombatSystem {
                 if (enemy.consumeDefeatReward()) {
                     world.spawnCrystalDrop(enemy);
                 }
+                removedEnemies.add(enemy);
                 enemyIterator.remove();
                 continue;
             }
@@ -73,6 +76,10 @@ public class GameCombatSystem {
             }
 
             enemy.update(deltaTimeMs);
+        }
+
+        for (Enemy removedEnemy : removedEnemies) {
+            removedEnemy.onRemoved(world);
         }
     }
 

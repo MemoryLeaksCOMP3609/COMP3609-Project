@@ -264,6 +264,10 @@ public abstract class Enemy extends Sprite {
         return true;
     }
 
+    public void onRemoved(GameWorld world) {
+        // Default enemies do not spawn anything on removal.
+    }
+
     @Override
     public void draw(Graphics2D g2) {
         BufferedImage frameToDraw = getFrameToDraw();

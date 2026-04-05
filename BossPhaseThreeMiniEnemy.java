@@ -1,8 +1,9 @@
-public class BossPhaseThreeEnemy extends BossEnemy {
+public class BossPhaseThreeMiniEnemy extends BossEnemy {
     private static final long FRAME_DURATION = 140;
 
-    public BossPhaseThreeEnemy(int startX, int startY) {
-        super("Abomination Phase 3", 3, 800, 3, 35, 250, 250, startX, startY);
+    public BossPhaseThreeMiniEnemy(int startX, int startY) {
+        super("Abomination Mini", 3, 200, 3, 9, 0, 0, startX, startY);
+        renderScale = 0.5;
         loadBossAnimations(
             "images/enemies/boss/bossPhase3Move.png",
             "images/enemies/boss/bossPhase3Attack.png",
@@ -18,12 +19,12 @@ public class BossPhaseThreeEnemy extends BossEnemy {
 
     @Override
     protected double getDashTriggerDistance() {
-        return 1000.0;
+        return 500.0;
     }
 
     @Override
     protected double getMaxDashDistance() {
-        return 1250.0;
+        return 625.0;
     }
 
     @Override
@@ -38,6 +39,6 @@ public class BossPhaseThreeEnemy extends BossEnemy {
 
     @Override
     public void onRemoved(GameWorld world) {
-        spawnChildrenAroundBody(world, ChildSpawnType.MINI);
+        spawnChildrenAroundBody(world, ChildSpawnType.MICRO);
     }
 }

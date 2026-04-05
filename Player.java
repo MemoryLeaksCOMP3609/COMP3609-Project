@@ -3,7 +3,7 @@ public class Player {
 
     private static final int BASE_MAX_HEALTH = 10000;
     private static final int BASE_MOVE_SPEED = 5;
-    private static final double BASE_DAMAGE_MULTIPLIER = 1.0;
+    private static final double BASE_DAMAGE_MULTIPLIER = 10.0;
     private static final double BASE_FIRE_RATE_MULTIPLIER = 1.0;
     private static final double BASE_PROJECTILE_COUNT_MULTIPLIER = 1.0;
     private static final double BASE_PROJECTILE_SIZE_MULTIPLIER = 1.0;

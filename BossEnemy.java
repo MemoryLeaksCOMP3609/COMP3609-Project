@@ -1,3 +1,4 @@
+import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 
 public abstract class BossEnemy extends Enemy {
@@ -7,6 +8,9 @@ public abstract class BossEnemy extends Enemy {
     private static final double BOSS_DEATH_MOVEMENT_REFERENCE_FRAME_MS = 40.0;
     private static final long RUN_AWAY_DEATH_DURATION_MS = 3000L;
     private static final double RUN_AWAY_SPEED_MULTIPLIER = 1.5;
+    private static final long SPLIT_DEATH_ANIMATION_MS = 1000L;
+    private static final long SPLIT_DEATH_HOLD_MS = 1000L;
+    private static final int SPLIT_CHILD_COUNT = 3;
 
     protected final int phaseNumber;
     private Animation attackSequenceAnimation;
@@ -194,6 +198,18 @@ public abstract class BossEnemy extends Enemy {
         attackAnimationRemainingMs = 0L;
         attackDamagePending = false;
 
+        if (usesSplitDeathSequence()) {
+            deathElapsedMs = 0L;
+            if (deathAnimationPath != null) {
+                deathAnimation = buildSplitDeathAnimation(deathAnimationPath);
+                currentAnimation = deathAnimation != null ? deathAnimation : currentAnimation;
+                if (currentAnimation != null) {
+                    currentAnimation.start();
+                }
+            }
+            return;
+        }
+
         if (!shouldRunAwayOnDeath()) {
             return;
         }
@@ -227,6 +243,19 @@ public abstract class BossEnemy extends Enemy {
 
     @Override
     protected void updateDeath(long deltaTimeMs) {
+        if (usesSplitDeathSequence()) {
+            deathElapsedMs = Math.min(SPLIT_DEATH_ANIMATION_MS + SPLIT_DEATH_HOLD_MS, deathElapsedMs + deltaTimeMs);
+            if (currentAnimation != null) {
+                currentAnimation.update(deltaTimeMs);
+                syncDimensionsWithCurrentFrame();
+            }
+
+            if (deathElapsedMs >= SPLIT_DEATH_ANIMATION_MS + SPLIT_DEATH_HOLD_MS) {
+                state = EnemyState.DEAD;
+            }
+            return;
+        }
+
         if (!shouldRunAwayOnDeath()) {
             super.updateDeath(deltaTimeMs);
             return;
@@ -268,6 +297,33 @@ public abstract class BossEnemy extends Enemy {
         drawFrame(g2, frameToDraw, 1.0f);
     }
 
+    protected boolean usesSplitDeathSequence() {
+        return false;
+    }
+
+    protected void spawnChildrenAroundBody(GameWorld world, ChildSpawnType childSpawnType) {
+        if (world == null) {
+            return;
+        }
+
+        int centerX = getCenterX();
+        int centerY = getCenterY();
+        int spawnRadius = Math.max(60, width / 3);
+
+        for (int i = 0; i < SPLIT_CHILD_COUNT; i++) {
+            double angle = (-Math.PI / 2.0) + (i * (Math.PI * 2.0 / SPLIT_CHILD_COUNT));
+            int spawnCenterX = (int) Math.round(centerX + Math.cos(angle) * spawnRadius);
+            int spawnCenterY = (int) Math.round(centerY + Math.sin(angle) * spawnRadius);
+            Enemy child = createChildEnemy(childSpawnType, spawnCenterX, spawnCenterY);
+            if (child != null) {
+                Rectangle2D.Double childBounds = child.getBoundingRectangle();
+                child.worldX = spawnCenterX - (int) Math.round(childBounds.getWidth() / 2.0);
+                child.worldY = spawnCenterY - (int) Math.round(childBounds.getHeight() / 2.0);
+                world.getEnemies().add(child);
+            }
+        }
+    }
+
     private void rememberPlayerState(PlayerSprite player) {
         lastKnownPlayerCenterX = player.getCenterX();
         lastKnownPlayerCenterY = player.getCenterY();
@@ -290,6 +346,41 @@ public abstract class BossEnemy extends Enemy {
 
     protected boolean shouldRunAwayOnDeath() {
         return false;
+    }
+
+    private Animation buildSplitDeathAnimation(String deathPath) {
+        BufferedImage[] frames = loadStripFrames(deathPath, 4);
+        if (frames.length == 0) {
+            return null;
+        }
+
+        long[] frameDurations = new long[frames.length + 1];
+        BufferedImage[] heldFrames = new BufferedImage[frames.length + 1];
+        long perFrameDuration = SPLIT_DEATH_ANIMATION_MS / frames.length;
+        long remainder = SPLIT_DEATH_ANIMATION_MS % frames.length;
+        for (int i = 0; i < frames.length; i++) {
+            heldFrames[i] = frames[i];
+            frameDurations[i] = perFrameDuration + (i < remainder ? 1L : 0L);
+        }
+        heldFrames[frames.length] = frames[frames.length - 1];
+        frameDurations[frames.length] = SPLIT_DEATH_HOLD_MS;
+        return buildAnimation(heldFrames, frameDurations, false);
+    }
+
+    private Enemy createChildEnemy(ChildSpawnType childSpawnType, int centerX, int centerY) {
+        switch (childSpawnType) {
+            case MINI:
+                return new BossPhaseThreeMiniEnemy(centerX, centerY);
+            case MICRO:
+                return new BossPhaseThreeMicroEnemy(centerX, centerY);
+            default:
+                return null;
+        }
+    }
+
+    protected enum ChildSpawnType {
+        MINI,
+        MICRO
     }
 
     public abstract void useSpecialAttack();
