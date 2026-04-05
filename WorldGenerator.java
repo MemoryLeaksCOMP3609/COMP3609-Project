@@ -119,94 +119,81 @@ public class WorldGenerator {
                                                        int collectibleSize, int minDistanceFromSolid) {
         ArrayList<Collectible> collectibles = new ArrayList<Collectible>();
         
-        // Load coin strip image for animated collectibles
-        BufferedImage coinStrip = ImageManager.loadBufferedImage("images/coinStrip.png");
+        for (int i = 0; i < numCollectibles; i++) {
+            collectibles.add(createCollectible(solidObjects, collectibles, collectibleSize, minDistanceFromSolid));
+        }
         
+        System.out.println("Created " + collectibles.size() + " animated coin collectibles at random positions");
+        return collectibles;
+    }
+
+    public Collectible createCollectible(ArrayList<SolidObject> solidObjects, ArrayList<Collectible> existingCollectibles,
+                                         int collectibleSize, int minDistanceFromSolid) {
         final int EDGE_MARGIN = 50;
         final int MAX_ATTEMPTS = 1000;
-        
-        // Generate random positions
-        int[][] positions = new int[numCollectibles][2];
-        
-        for (int i = 0; i < numCollectibles; i++) {
-            boolean validPosition = false;
-            int attempts = 0;
-            int x = 0, y = 0;
-            
-            while (!validPosition && attempts < MAX_ATTEMPTS) {
-                attempts++;
-                
-                // Generate random position within world bounds
-                x = EDGE_MARGIN + random.nextInt(worldWidth - 2 * EDGE_MARGIN - collectibleSize);
-                y = EDGE_MARGIN + random.nextInt(worldHeight - 2 * EDGE_MARGIN - collectibleSize);
-                
-                validPosition = true;
-                
-                // Check distance from solid objects
-                for (SolidObject solid : solidObjects) {
-                    Rectangle2D.Double solidBounds = solid.getBoundingRectangle();
-                    double distance = getDistanceFromRect(x, y, solidBounds);
-                    
-                    if (distance < minDistanceFromSolid) {
-                        validPosition = false;
-                        break;
-                    }
-                }
-                
-                // Check distance from other collectibles
-                if (validPosition) {
-                    for (int j = 0; j < i; j++) {
-                        double dist = Math.sqrt(
-                            Math.pow(x - positions[j][0], 2) + 
-                            Math.pow(y - positions[j][1], 2)
-                        );
-                        if (dist < minDistanceFromSolid) {
-                            validPosition = false;
-                            break;
-                        }
-                    }
-                }
-            }
-            
-            if (validPosition) {
-                positions[i][0] = x;
-                positions[i][1] = y;
-            } else {
-                positions[i][0] = EDGE_MARGIN + random.nextInt(worldWidth - 2 * EDGE_MARGIN);
-                positions[i][1] = EDGE_MARGIN + random.nextInt(worldHeight - 2 * EDGE_MARGIN);
-                System.out.println("Warning: Could not find valid position for collectible " + i + " after " + MAX_ATTEMPTS + " attempts");
+
+        int x = EDGE_MARGIN;
+        int y = EDGE_MARGIN;
+        boolean validPosition = false;
+
+        for (int attempts = 0; attempts < MAX_ATTEMPTS && !validPosition; attempts++) {
+            x = EDGE_MARGIN + random.nextInt(worldWidth - 2 * EDGE_MARGIN - collectibleSize);
+            y = EDGE_MARGIN + random.nextInt(worldHeight - 2 * EDGE_MARGIN - collectibleSize);
+            validPosition = isValidCollectiblePosition(x, y, solidObjects, existingCollectibles, minDistanceFromSolid);
+        }
+
+        if (!validPosition) {
+            x = EDGE_MARGIN + random.nextInt(worldWidth - 2 * EDGE_MARGIN - collectibleSize);
+            y = EDGE_MARGIN + random.nextInt(worldHeight - 2 * EDGE_MARGIN - collectibleSize);
+            System.out.println("Warning: Could not find ideal position for collectible respawn");
+        }
+
+        return createCoinCollectible(x, y, collectibleSize);
+    }
+
+    private boolean isValidCollectiblePosition(int x, int y, ArrayList<SolidObject> solidObjects,
+                                               ArrayList<Collectible> existingCollectibles, int minDistanceFromSolid) {
+        for (SolidObject solid : solidObjects) {
+            Rectangle2D.Double solidBounds = solid.getBoundingRectangle();
+            double distance = getDistanceFromRect(x, y, solidBounds);
+
+            if (distance < minDistanceFromSolid) {
+                return false;
             }
         }
-        
+
+        for (Collectible collectible : existingCollectibles) {
+            if (collectible.isCollected()) {
+                continue;
+            }
+
+            double dist = Math.sqrt(
+                Math.pow(x - collectible.getX(), 2) +
+                Math.pow(y - collectible.getY(), 2)
+            );
+            if (dist < minDistanceFromSolid) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private Collectible createCoinCollectible(int x, int y, int collectibleSize) {
+        BufferedImage coinStrip = ImageManager.loadBufferedImage("images/coinStrip.png");
+
         if (coinStrip != null) {
-            System.out.println("Coin strip loaded: " + coinStrip.getWidth() + "x" + coinStrip.getHeight());
-            
-            // Create animated collectibles
             StripAnimation stripAnim = new StripAnimation(170, coinStrip.getHeight(), 18);
             stripAnim.setAnimationSpeed(60);
-            
             BufferedImage[] coinFrames = stripAnim.extractFramesFromRow(coinStrip, 0);
-            System.out.println("Extracted " + coinFrames.length + " coin frames");
-            
             Animation coinAnimation = stripAnim.createAnimationFromFrames(coinFrames, 60, false);
-            
-            // Create animated sprites at the randomly generated positions
-            for (int i = 0; i < positions.length; i++) {
-                AnimatedSprite coinSprite = new AnimatedSprite(null, positions[i][0], positions[i][1], collectibleSize, collectibleSize);
-                coinSprite.setAnimation(coinAnimation);
-                
-                collectibles.add(new Collectible(positions[i][0], positions[i][1], collectibleSize, collectibleSize, coinSprite));
-            }
-            
-            System.out.println("Created " + collectibles.size() + " animated coin collectibles at random positions");
-        } else {
-            System.out.println("Failed to load coinStrip.png, creating collectibles with placeholder sprites");
-            for (int i = 0; i < positions.length; i++) {
-                collectibles.add(new Collectible(positions[i][0], positions[i][1], collectibleSize, collectibleSize, null));
-            }
+
+            AnimatedSprite coinSprite = new AnimatedSprite(null, x, y, collectibleSize, collectibleSize);
+            coinSprite.setAnimation(coinAnimation);
+            return new Collectible(x, y, collectibleSize, collectibleSize, coinSprite);
         }
-        
-        return collectibles;
+
+        return new Collectible(x, y, collectibleSize, collectibleSize, null);
     }
     
     public ArrayList<AnimatedSprite> createAnimatedSprites(javax.swing.JPanel panel) {

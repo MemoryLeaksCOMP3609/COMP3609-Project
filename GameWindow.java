@@ -33,10 +33,12 @@ public class GameWindow extends JFrame
         mainPanel = new JPanel();
         mainPanel.setLayout(new BorderLayout());
         mainPanel.setBackground(Color.BLACK);
+        mainPanel.setFocusable(true);
         
         infoPanel = new InfoPanel();
         
         gamePanel = new GamePanel(infoPanel);
+        gamePanel.setFocusable(true);
         
         createButtonPanel();
         
@@ -47,6 +49,8 @@ public class GameWindow extends JFrame
         
         // Set up keyboard input
         mainPanel.addKeyListener(this);
+        gamePanel.addKeyListener(this);
+        addKeyListener(this);
         
         // Add main panel to window
         c = getContentPane();
@@ -56,6 +60,7 @@ public class GameWindow extends JFrame
         setResizable(true);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setVisible(true);
+        requestGameFocus();
     }
     
     private void createButtonPanel() {
@@ -76,12 +81,8 @@ public class GameWindow extends JFrame
     }
     
     private void updateInfoPanel() {
-        PlayerSprite player = gamePanel.getPlayer();
-        if (player != null) {
-            infoPanel.updatePlayerPosition(player.getWorldX(), player.getWorldY());
-        }
+        infoPanel.updatePlayerStats(gamePanel.getPlayerData());
         infoPanel.updateFPS(gamePanel.getFPS());
-        infoPanel.updateCollectibles(gamePanel.getCollectedCount(), gamePanel.getTotalCollectibles());
         infoPanel.updateActiveEffects(gamePanel.getActiveEffectName());
     }
     
@@ -91,11 +92,23 @@ public class GameWindow extends JFrame
         
         if (command.equals(startB.getText())) {
             if (gamePanel.isGameOver()) {
+                WeaponType selectedWeapon = promptForWeaponChoice();
+                if (selectedWeapon == null) {
+                    requestGameFocus();
+                    return;
+                }
+                gamePanel.setSelectedWeapon(selectedWeapon);
                 gamePanel.resetGame();
             } else if (!gamePanel.isGameRunning()) {
+                WeaponType selectedWeapon = promptForWeaponChoice();
+                if (selectedWeapon == null) {
+                    requestGameFocus();
+                    return;
+                }
+                gamePanel.setSelectedWeapon(selectedWeapon);
                 gamePanel.startGame();
             }
-            mainPanel.requestFocus();
+            requestGameFocus();
         }
         
         if (command.equals(pauseB.getText())) {
@@ -105,14 +118,14 @@ public class GameWindow extends JFrame
             } else {
                 pauseB.setText("Pause");
             }
-            mainPanel.requestFocus();
+            requestGameFocus();
         }
         
         if (command.equals(exitB.getText())) {
             System.exit(0);
         }
         
-        mainPanel.requestFocus();
+        requestGameFocus();
     }
     
     @Override
@@ -156,5 +169,36 @@ public class GameWindow extends JFrame
     @Override
     public void keyTyped(KeyEvent e) {
         // Not used
+    }
+
+    private WeaponType promptForWeaponChoice() {
+        WeaponType[] options = WeaponType.values();
+        String[] labels = new String[options.length];
+        for (int i = 0; i < options.length; i++) {
+            labels[i] = options[i].getDisplayName();
+        }
+
+        int selectedIndex = JOptionPane.showOptionDialog(
+            this,
+            "Choose your starting weapon",
+            "Weapon Select",
+            JOptionPane.DEFAULT_OPTION,
+            JOptionPane.PLAIN_MESSAGE,
+            null,
+            labels,
+            labels[0]
+        );
+
+        if (selectedIndex < 0 || selectedIndex >= options.length) {
+            return null;
+        }
+
+        return options[selectedIndex];
+    }
+
+    private void requestGameFocus() {
+        gamePanel.requestFocusInWindow();
+        mainPanel.requestFocusInWindow();
+        requestFocusInWindow();
     }
 }

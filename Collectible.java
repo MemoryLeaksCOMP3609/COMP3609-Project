@@ -87,4 +87,12 @@ public class Collectible {
     public int getScreenY() {
         return screenY;
     }
+
+    public int getX() {
+        return x;
+    }
+
+    public int getY() {
+        return y;
+    }
 }

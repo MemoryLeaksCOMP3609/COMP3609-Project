@@ -1,5 +1,5 @@
+import java.awt.Color;
 import java.awt.Graphics2D;
-import java.awt.Image;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.Map;
@@ -9,19 +9,26 @@ import javax.swing.JPanel;
  * Player sprite with keyboard movement (arrow keys/WASD) and animation states
  */
 public class PlayerSprite extends Sprite {
+    private static final double MOVEMENT_REFERENCE_FRAME_MS = 40.0;
+    private final Player playerData;
     
     private int worldX;
     private int worldY;
-    private int baseSpeed = 5; // Store the normal speed
-    private int dx = baseSpeed;
-    private int dy = baseSpeed;
+    private double preciseWorldX;
+    private double preciseWorldY;
     private boolean speedBoostActive = false;
     private long speedBoostTimer = 0; // Time remaining in milliseconds
     private static final long SPEED_BOOST_DURATION = 1000; // 1 second
     private static final int SPEED_BOOST_MULTIPLIER = 3; // 3x speed
-    private static final long RUN_FRAME_DURATION = 40;
+    private static final long RUN_FRAME_DURATION = 200;
+    private static final long DAMAGE_FLASH_DURATION_MS = 120;
     private int screenX;
     private int screenY;
+    private double preciseScreenX;
+    private double preciseScreenY;
+    private long damageFlashRemainingMs;
+    private BufferedImage cachedBaseFrame;
+    private BufferedImage cachedDamageFlashFrame;
     
     // Animation states
     public static final int STATE_IDLE = 0;
@@ -80,13 +87,21 @@ public class PlayerSprite extends Sprite {
         return Math.max(min, Math.min(value, max));
     }
     
-    public PlayerSprite(JPanel p, int xPos, int yPos, int worldW, int worldH) {
+    public PlayerSprite(JPanel p, Player player, int xPos, int yPos, int worldW, int worldH) {
         super(p, xPos, yPos, 50, 50);
+        playerData = player;
         
         worldX = xPos;
         worldY = yPos;
+        preciseWorldX = xPos;
+        preciseWorldY = yPos;
         screenX = xPos;
         screenY = yPos;
+        preciseScreenX = xPos;
+        preciseScreenY = yPos;
+        damageFlashRemainingMs = 0;
+        cachedBaseFrame = null;
+        cachedDamageFlashFrame = null;
         width = 50;
         height = 50;
         
@@ -149,60 +164,61 @@ public class PlayerSprite extends Sprite {
         currentAnimation.start();
     }
     
-    public void move(int direction) {
+    public void move(int direction, long deltaTimeMs) {
         if (!panel.isVisible()) return;
         
         Animation animationToPlay = null;
+        double moveDistance = getCurrentMoveSpeed() * (deltaTimeMs / MOVEMENT_REFERENCE_FRAME_MS);
         
         switch (direction) {
             case DIR_LEFT:
-                worldX = worldX - dx;
+                preciseWorldX -= moveDistance;
                 facingDirection = DIR_LEFT;
                 currentState = STATE_RUN;
                 animationToPlay = runLeftAnim;
                 break;
             case DIR_RIGHT:
-                worldX = worldX + dx;
+                preciseWorldX += moveDistance;
                 facingDirection = DIR_RIGHT;
                 currentState = STATE_RUN;
                 animationToPlay = runRightAnim;
                 break;
             case DIR_UP:
-                worldY = worldY - dy;
+                preciseWorldY -= moveDistance;
                 facingDirection = DIR_UP;
                 currentState = STATE_RUN;
                 animationToPlay = runUpAnim;
                 break;
             case DIR_DOWN:
-                worldY = worldY + dy;
+                preciseWorldY += moveDistance;
                 facingDirection = DIR_DOWN;
                 currentState = STATE_RUN;
                 animationToPlay = runDownAnim;
                 break;
             case DIR_UP_LEFT:
-                worldX = worldX - dx;
-                worldY = worldY - dy;
+                preciseWorldX -= moveDistance;
+                preciseWorldY -= moveDistance;
                 facingDirection = DIR_UP_LEFT;
                 currentState = STATE_RUN;
                 animationToPlay = runUpLeftAnim;
                 break;
             case DIR_UP_RIGHT:
-                worldX = worldX + dx;
-                worldY = worldY - dy;
+                preciseWorldX += moveDistance;
+                preciseWorldY -= moveDistance;
                 facingDirection = DIR_UP_RIGHT;
                 currentState = STATE_RUN;
                 animationToPlay = runUpRightAnim;
                 break;
             case DIR_DOWN_LEFT:
-                worldX = worldX - dx;
-                worldY = worldY + dy;
+                preciseWorldX -= moveDistance;
+                preciseWorldY += moveDistance;
                 facingDirection = DIR_DOWN_LEFT;
                 currentState = STATE_RUN;
                 animationToPlay = runDownLeftAnim;
                 break;
             case DIR_DOWN_RIGHT:
-                worldX = worldX + dx;
-                worldY = worldY + dy;
+                preciseWorldX += moveDistance;
+                preciseWorldY += moveDistance;
                 facingDirection = DIR_DOWN_RIGHT;
                 currentState = STATE_RUN;
                 animationToPlay = runDownRightAnim;
@@ -213,8 +229,9 @@ public class PlayerSprite extends Sprite {
         setAnimationAndPlaySound(animationToPlay);
         
         // Clamp to world bounds
-        worldX = clamp(worldX, 0, worldWidth - width);
-        worldY = clamp(worldY, 0, worldHeight - height);
+        preciseWorldX = clampToWorldBounds(preciseWorldX, width, worldWidth);
+        preciseWorldY = clampToWorldBounds(preciseWorldY, height, worldHeight);
+        syncPrecisePositionToWorldPosition();
     }
     
     private void setAnimationAndPlaySound(Animation anim) {
@@ -232,9 +249,10 @@ public class PlayerSprite extends Sprite {
      * Screen position = world position - camera position.
      */
     public void updateScreenPosition(int cameraX, int cameraY) {
-        // Calculate screen position based on camera offset
-        screenX = worldX - cameraX;
-        screenY = worldY - cameraY;
+        preciseScreenX = preciseWorldX - cameraX;
+        preciseScreenY = preciseWorldY - cameraY;
+        screenX = (int) Math.round(preciseScreenX);
+        screenY = (int) Math.round(preciseScreenY);
     }
     
     public void setIdle() {
@@ -249,11 +267,15 @@ public class PlayerSprite extends Sprite {
         soundManager.stopFootstep();
     }
     
-    public void update() {
+    public void update(long deltaTimeMs) {
         syncDimensionsWithCurrentFrame();
         if (currentAnimation != null) {
-            currentAnimation.update();
+            currentAnimation.update(deltaTimeMs);
         }
+    }
+
+    public void update() {
+        update(0);
     }
     
     // Draws the player at screen position.
@@ -262,7 +284,11 @@ public class PlayerSprite extends Sprite {
 
         BufferedImage currentFrame = getCurrentBufferedImage();
         if (currentFrame != null) {
-            g2.drawImage(currentFrame, screenX, screenY, width, height, null);
+            BufferedImage frameToDraw = currentFrame;
+            if (damageFlashRemainingMs > 0) {
+                frameToDraw = getDamageFlashFrame(currentFrame);
+            }
+            g2.drawImage(frameToDraw, screenX, screenY, width, height, null);
         }
     }
     
@@ -294,6 +320,14 @@ public class PlayerSprite extends Sprite {
     public int getScreenY() {
         return screenY;
     }
+
+    public int getCenterX() {
+        return worldX + width / 2;
+    }
+
+    public int getCenterY() {
+        return worldY + height / 2;
+    }
     
 
     
@@ -302,8 +336,6 @@ public class PlayerSprite extends Sprite {
      * Multiple activations reset the timer.
      */
     public void activateSpeedBoost() {
-        dx = baseSpeed * SPEED_BOOST_MULTIPLIER;
-        dy = baseSpeed * SPEED_BOOST_MULTIPLIER;
         speedBoostActive = true;
         speedBoostTimer = SPEED_BOOST_DURATION;
     }
@@ -315,18 +347,18 @@ public class PlayerSprite extends Sprite {
                 // Speed boost expired, reset to base speed
                 speedBoostTimer = 0;
                 speedBoostActive = false;
-                dx = baseSpeed;
-                dy = baseSpeed;
             }
         }
     }
     
     public void setWorldX(int x) {
         worldX = x;
+        preciseWorldX = x;
     }
     
     public void setWorldY(int y) {
         worldY = y;
+        preciseWorldY = y;
     }
 
     private void syncDimensionsWithCurrentFrame() {
@@ -335,5 +367,51 @@ public class PlayerSprite extends Sprite {
             width = currentFrame.getWidth();
             height = currentFrame.getHeight();
         }
+    }
+
+    private int getCurrentMoveSpeed() {
+        int moveSpeed = playerData.getMoveSpeed();
+        if (speedBoostActive) {
+            return moveSpeed * SPEED_BOOST_MULTIPLIER;
+        }
+        return moveSpeed;
+    }
+
+    private double clampToWorldBounds(double value, int spriteSize, int worldSize) {
+        return Math.max(0.0, Math.min(value, Math.max(0, worldSize - spriteSize)));
+    }
+
+    private void syncPrecisePositionToWorldPosition() {
+        worldX = (int) Math.round(preciseWorldX);
+        worldY = (int) Math.round(preciseWorldY);
+    }
+
+    public Player getPlayerData() {
+        return playerData;
+    }
+
+    public void triggerDamageFlash() {
+        damageFlashRemainingMs = DAMAGE_FLASH_DURATION_MS;
+    }
+
+    public void updateDamageFlash(long deltaTimeMs) {
+        damageFlashRemainingMs = Math.max(0, damageFlashRemainingMs - deltaTimeMs);
+        if (damageFlashRemainingMs == 0) {
+            cachedBaseFrame = null;
+            cachedDamageFlashFrame = null;
+        }
+    }
+
+    private BufferedImage getDamageFlashFrame(BufferedImage currentFrame) {
+        if (currentFrame == null) {
+            return null;
+        }
+
+        if (currentFrame != cachedBaseFrame || cachedDamageFlashFrame == null) {
+            cachedBaseFrame = currentFrame;
+            cachedDamageFlashFrame = ImageManager.tintVisiblePixels(currentFrame, Color.RED, 0.45f);
+        }
+
+        return cachedDamageFlashFrame;
     }
 }

@@ -43,11 +43,18 @@ public class Animation {
     public synchronized void update() {
         if (!isActive || frames.size() <= 1)
             return;
-        
+
         long currTime = System.currentTimeMillis();
         long elapsedTime = currTime - startTime;
         startTime = currTime;
-        
+
+        update(elapsedTime);
+    }
+
+    public synchronized void update(long elapsedTime) {
+        if (!isActive || frames.size() <= 1)
+            return;
+
         animTime += elapsedTime;
         
         if (animTime >= totalDuration) {
