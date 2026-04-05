@@ -55,6 +55,8 @@ public class GameCombatSystem {
                 if (enemy.isAlive()) {
                     updateBatEnemy(enemy, player, deltaTimeMs, distanceToPlayer);
                 }
+            } else if (enemy instanceof BossEnemy) {
+                ((BossEnemy) enemy).updateBehavior(player, deltaTimeMs);
             } else if (enemy instanceof SkeletonEnemy) {
                 ((SkeletonEnemy) enemy).updateBehavior(player, deltaTimeMs);
             } else if (enemy instanceof GhostEnemy) {
@@ -104,6 +106,7 @@ public class GameCombatSystem {
         Rectangle2D.Double playerBounds = player.getBoundingRectangle();
         handleCollectibleCollisions(player, playerData, playerBounds, queueLevelUpChoices);
         handleCrystalCollisions(playerData, playerBounds, queueLevelUpChoices);
+        handleBossContactCollisions(player, playerData, playerBounds, onPlayerDeath);
         handleSkeletonDashCollisions(player, playerData, playerBounds, onPlayerDeath);
         handleGhostContactCollisions(player, playerData, playerBounds, onPlayerDeath);
         handleProjectileCollisions(player, playerData, onPlayerDeath);
@@ -194,6 +197,34 @@ public class GameCombatSystem {
                 playerData.takeDamage(skeleton.getContactDamage());
                 player.triggerDamageFlash();
                 skeleton.markDashHitApplied();
+                if (playerData.getHealth() <= 0) {
+                    onPlayerDeath.run();
+                }
+            }
+        }
+    }
+
+    private void handleBossContactCollisions(PlayerSprite player, Player playerData,
+                                             Rectangle2D.Double playerBounds, Runnable onPlayerDeath) {
+        if (playerData == null) {
+            return;
+        }
+
+        for (Enemy enemy : world.getEnemies()) {
+            if (!(enemy instanceof BossEnemy) || !enemy.isTargetable()) {
+                continue;
+            }
+
+            BossEnemy boss = (BossEnemy) enemy;
+            if (!boss.hasAttackDamagePending() || !boss.isOnAttackImpactFrame()) {
+                continue;
+            }
+
+            if (PixelCollision.intersects(playerBounds, player.getCurrentBufferedImage(),
+                enemy.getBoundingRectangle(), enemy.getCurrentBufferedImage())) {
+                playerData.takeDamage(enemy.getContactDamage());
+                player.triggerDamageFlash();
+                boss.consumeAttackDamage();
                 if (playerData.getHealth() <= 0) {
                     onPlayerDeath.run();
                 }

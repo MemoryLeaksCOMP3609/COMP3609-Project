@@ -159,7 +159,8 @@ public abstract class Enemy extends Sprite {
         moveToward(targetX, targetY, 0, deltaTimeMs);
     }
 
-    public void moveToward(int targetX, int targetY, int stopDistance, long deltaTimeMs) {
+    protected void moveTowardWithSpeedMultiplier(int targetX, int targetY, int stopDistance,
+                                                 long deltaTimeMs, double speedMultiplier) {
         if (!isAlive()) {
             return;
         }
@@ -173,7 +174,7 @@ public abstract class Enemy extends Sprite {
             return;
         }
 
-        double moveDistance = movementSpeed * (deltaTimeMs / MOVEMENT_REFERENCE_FRAME_MS);
+        double moveDistance = movementSpeed * speedMultiplier * (deltaTimeMs / MOVEMENT_REFERENCE_FRAME_MS);
         double directionX = deltaX / distance;
         double directionY = deltaY / distance;
 
@@ -183,6 +184,10 @@ public abstract class Enemy extends Sprite {
         worldY += (int) Math.round(directionY * moveDistance);
 
         setAnimationForState(EnemyState.MOVING);
+    }
+
+    public void moveToward(int targetX, int targetY, int stopDistance, long deltaTimeMs) {
+        moveTowardWithSpeedMultiplier(targetX, targetY, stopDistance, deltaTimeMs, 1.0);
     }
 
     protected void faceToward(int targetX) {
