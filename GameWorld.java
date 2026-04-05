@@ -31,9 +31,6 @@ public class GameWorld {
     private ArrayList<Enemy> enemies;
     private ArrayList<Projectile> projectiles;
     private ArrayList<DroppedCrystal> droppedCrystals;
-    private boolean bossPhaseOneSpawned;
-    private boolean bossPhaseTwoSpawned;
-    private boolean bossPhaseThreeSpawned;
     private int cameraX;
     private int cameraY;
     private int viewportWidth;
@@ -63,9 +60,6 @@ public class GameWorld {
         this.enemies = new ArrayList<Enemy>();
         this.projectiles = new ArrayList<Projectile>();
         this.droppedCrystals = new ArrayList<DroppedCrystal>();
-        this.bossPhaseOneSpawned = false;
-        this.bossPhaseTwoSpawned = false;
-        this.bossPhaseThreeSpawned = false;
         this.cameraX = 0;
         this.cameraY = 0;
         this.viewportWidth = worldWidth;
@@ -85,9 +79,6 @@ public class GameWorld {
         projectiles = new ArrayList<Projectile>();
         droppedCrystals = new ArrayList<DroppedCrystal>();
         enemySpawner.reset();
-        bossPhaseOneSpawned = false;
-        bossPhaseTwoSpawned = false;
-        bossPhaseThreeSpawned = false;
         cameraX = 0;
         cameraY = 0;
     }
@@ -220,7 +211,7 @@ public class GameWorld {
     }
 
     public boolean spawnTestBoss(TestBossSpawnType bossType) {
-        if (player == null || bossType == null || hasBossSpawned(bossType)) {
+        if (player == null || bossType == null) {
             return false;
         }
 
@@ -230,41 +221,7 @@ public class GameWorld {
         int spawnX = clamp(player.getWorldX() + 220, 0, worldWidth - 250);
         int spawnY = clamp(player.getWorldY(), 0, worldHeight - 250);
         enemies.add(bossType.createBoss(spawnX, spawnY));
-        markBossSpawned(bossType);
         return true;
-    }
-
-    public boolean hasBossSpawned(TestBossSpawnType bossType) {
-        if (bossType == null) {
-            return false;
-        }
-
-        switch (bossType) {
-            case PHASE_1:
-                return bossPhaseOneSpawned;
-            case PHASE_2:
-                return bossPhaseTwoSpawned;
-            case PHASE_3:
-                return bossPhaseThreeSpawned;
-            default:
-                return false;
-        }
-    }
-
-    private void markBossSpawned(TestBossSpawnType bossType) {
-        switch (bossType) {
-            case PHASE_1:
-                bossPhaseOneSpawned = true;
-                break;
-            case PHASE_2:
-                bossPhaseTwoSpawned = true;
-                break;
-            case PHASE_3:
-                bossPhaseThreeSpawned = true;
-                break;
-            default:
-                break;
-        }
     }
 
     private void purgeAllEnemies() {

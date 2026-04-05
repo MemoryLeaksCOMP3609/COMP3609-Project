@@ -2,6 +2,7 @@ import java.util.Iterator;
 
 public class FireBallWeapon extends Weapon {
     private static final int FIRE_BALL_BASE_PROJECTILE_COUNT = 2;
+    private static final int FIRE_BALL_BASE_DAMAGE = 20;
     private static final double FIRE_BALL_ORBIT_RADIUS = 90.0;
     private static final double FIRE_BALL_BASE_ANGULAR_SPEED = 0.0035;
     private static final double FIRE_BALL_BASE_SCALE = 0.10;
@@ -86,6 +87,11 @@ public class FireBallWeapon extends Weapon {
     protected int getProjectileCount(Player playerData) {
         int bonusProjectiles = Math.max(0, (int) Math.round(playerData.getProjectileCountMultiplier()) - 1);
         return FIRE_BALL_BASE_PROJECTILE_COUNT + bonusProjectiles;
+    }
+
+    @Override
+    protected int getDamage(Player playerData) {
+        return (int) Math.round(FIRE_BALL_BASE_DAMAGE * playerData.getDamageMultiplier());
     }
 
     @Override

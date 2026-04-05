@@ -503,12 +503,6 @@ public class GamePanel extends JPanel {
         }
     }
 
-    public boolean hasTestBossSpawned(TestBossSpawnType bossType) {
-        synchronized (stateLock) {
-            return world.hasBossSpawned(bossType);
-        }
-    }
-
     public void activateTestEnemySpawn(TestEnemySpawnType spawnType) {
         synchronized (stateLock) {
             world.activateTestEnemySpawn(spawnType);

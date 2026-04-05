@@ -44,6 +44,11 @@ public class EnemySpawner {
             return;
         }
 
+        if (hasLivingBoss(enemies)) {
+            spawnCooldownRemaining = 0;
+            return;
+        }
+
         if (spawnCooldownRemaining > 0) {
             spawnCooldownRemaining = Math.max(0, spawnCooldownRemaining - deltaTimeMs);
         }
@@ -54,6 +59,15 @@ public class EnemySpawner {
 
         enemies.add(spawnEnemyNearPlayer(player));
         spawnCooldownRemaining = SPAWN_COOLDOWN_MS;
+    }
+
+    private boolean hasLivingBoss(ArrayList<Enemy> enemies) {
+        for (Enemy enemy : enemies) {
+            if (enemy instanceof BossEnemy && enemy.isAlive()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private int countLivingEnemies(ArrayList<Enemy> enemies) {

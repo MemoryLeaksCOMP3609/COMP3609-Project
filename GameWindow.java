@@ -73,6 +73,8 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
     private Rectangle[] testBossButtonBounds;
     private boolean[] testEnemyButtonHovered;
     private boolean[] testBossButtonHovered;
+    private TestEnemySpawnType selectedTestEnemyButton;
+    private TestBossSpawnType selectedTestBossButton;
 
     public GameWindow() {
         super("Coin Collector");
@@ -95,6 +97,8 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         testBossButtonBounds = new Rectangle[testBossButtons.length];
         testEnemyButtonHovered = new boolean[testEnemyButtons.length];
         testBossButtonHovered = new boolean[testBossButtons.length];
+        selectedTestEnemyButton = TestEnemySpawnType.BAT;
+        selectedTestBossButton = null;
 
         launcherPanel = new JPanel();
         launcherPanel.setLayout(new BoxLayout(launcherPanel, BoxLayout.Y_AXIS));
@@ -359,6 +363,8 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
 
         for (int i = 0; i < testEnemyButtonBounds.length; i++) {
             if (testEnemyButtonBounds[i] != null && testEnemyButtonBounds[i].contains(mouseX, mouseY)) {
+                selectedTestEnemyButton = testEnemyButtons[i];
+                selectedTestBossButton = null;
                 gamePanel.activateTestEnemySpawn(testEnemyButtons[i]);
                 return;
             }
@@ -366,6 +372,8 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
 
         for (int i = 0; i < testBossButtonBounds.length; i++) {
             if (testBossButtonBounds[i] != null && testBossButtonBounds[i].contains(mouseX, mouseY)) {
+                selectedTestBossButton = testBossButtons[i];
+                selectedTestEnemyButton = null;
                 gamePanel.spawnTestBoss(testBossButtons[i]);
                 return;
             }
@@ -421,8 +429,7 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         }
         for (int i = 0; i < testBossButtonBounds.length; i++) {
             testBossButtonHovered[i] = testBossButtonBounds[i] != null
-                && testBossButtonBounds[i].contains(mouseX, mouseY)
-                && !gamePanel.hasTestBossSpawned(testBossButtons[i]);
+                && testBossButtonBounds[i].contains(mouseX, mouseY);
         }
         updateChoiceHoverStates(mouseX, mouseY);
     }
@@ -453,7 +460,18 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
 
     private void updateTestButtonBounds(int screenWidth) {
         FontMetrics metrics = getFontMetrics(new Font("Arial", Font.BOLD, 14));
-        int x = BUTTON_MARGIN;
+        int totalWidth = 0;
+        for (int i = 0; i < testEnemyButtons.length; i++) {
+            totalWidth += metrics.stringWidth(testEnemyButtons[i].getDisplayName()) + (TEST_BUTTON_PADDING * 2);
+        }
+        totalWidth += TEST_BUTTON_GAP * Math.max(0, testEnemyButtons.length - 1);
+        totalWidth += 20;
+        for (int i = 0; i < testBossButtons.length; i++) {
+            totalWidth += metrics.stringWidth(testBossButtons[i].getDisplayName()) + (TEST_BUTTON_PADDING * 2);
+        }
+        totalWidth += TEST_BUTTON_GAP * Math.max(0, testBossButtons.length - 1);
+
+        int x = Math.max(BUTTON_MARGIN, (screenWidth - totalWidth) / 2);
         int y = BUTTON_MARGIN;
 
         for (int i = 0; i < testEnemyButtons.length; i++) {
@@ -462,7 +480,7 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
             x += buttonWidth + TEST_BUTTON_GAP;
         }
 
-        x = Math.min(x + 20, Math.max(BUTTON_MARGIN, screenWidth - BUTTON_MARGIN));
+        x += 20;
         for (int i = 0; i < testBossButtons.length; i++) {
             int buttonWidth = metrics.stringWidth(testBossButtons[i].getDisplayName()) + (TEST_BUTTON_PADDING * 2);
             testBossButtonBounds[i] = new Rectangle(x, y, buttonWidth, TEST_BUTTON_HEIGHT);
@@ -507,27 +525,25 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
     }
 
     private void drawTestButtons(Graphics2D g2) {
-        TestEnemySpawnType activeType = gamePanel.getActiveTestEnemySpawnType();
         for (int i = 0; i < testEnemyButtons.length; i++) {
             drawTestButton(
                 g2,
                 testEnemyButtonBounds[i],
                 testEnemyButtons[i].getDisplayName(),
                 testEnemyButtonHovered[i],
-                testEnemyButtons[i] == activeType,
+                testEnemyButtons[i] == selectedTestEnemyButton,
                 false
             );
         }
 
         for (int i = 0; i < testBossButtons.length; i++) {
-            boolean used = gamePanel.hasTestBossSpawned(testBossButtons[i]);
             drawTestButton(
                 g2,
                 testBossButtonBounds[i],
                 testBossButtons[i].getDisplayName(),
                 testBossButtonHovered[i],
-                false,
-                used
+                testBossButtons[i] == selectedTestBossButton,
+                false
             );
         }
     }

@@ -1,5 +1,5 @@
 public abstract class Weapon {
-    protected static final int PLAYER_ATTACK_RANGE = 500;
+    protected static final int PLAYER_ATTACK_RANGE = 1000;
     protected static final int PLAYER_BASE_DAMAGE = 10;
     protected static final long PLAYER_BURST_SPACING_MS = 150L;
 
