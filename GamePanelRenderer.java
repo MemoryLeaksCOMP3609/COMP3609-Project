@@ -6,6 +6,12 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 
 public class GamePanelRenderer {
+    private static final int PLAYER_HEALTH_BAR_WIDTH = 150;
+    private static final int ENEMY_HEALTH_BAR_WIDTH = 100;
+    private static final int HEALTH_BAR_HEIGHT = 10;
+    private static final int HEALTH_BAR_VERTICAL_OFFSET = 12;
+    private static final int HEALTH_BAR_BORDER_THICKNESS = 2;
+
     private final int worldWidth;
     private final int worldHeight;
     private final int goldenTintColor;
@@ -113,6 +119,8 @@ public class GamePanelRenderer {
                 projectile.draw(g2, world.getCameraX(), world.getCameraY());
             }
         }
+
+        drawHealthBars(g2, panelWidth, panelHeight, world);
     }
 
     private void drawGrayScaleOverlay(Graphics2D g2, int panelWidth, int panelHeight, BufferedImage doubleBufferImage) {
@@ -163,5 +171,87 @@ public class GamePanelRenderer {
             panelHeight
         );
         return viewport.intersects(worldBounds);
+    }
+
+    private void drawHealthBars(Graphics2D g2, int panelWidth, int panelHeight, GameWorld world) {
+        PlayerSprite playerSprite = world.getPlayer();
+        Player playerData = world.getPlayerData();
+        if (playerSprite != null && playerData != null && playerData.getMaxHealth() > 0) {
+            Rectangle2D.Double playerBounds = playerSprite.getBoundingRectangle();
+            drawHealthBar(
+                g2,
+                playerBounds,
+                world,
+                panelWidth,
+                panelHeight,
+                PLAYER_HEALTH_BAR_WIDTH,
+                playerData.getHealth(),
+                playerData.getMaxHealth()
+            );
+        }
+
+        for (Enemy enemy : world.getEnemies()) {
+            if (enemy == null || enemy.getMaxHealth() <= 0 || enemy.getCurrentHealth() <= 0) {
+                continue;
+            }
+
+            Rectangle2D.Double enemyBounds = enemy.getBoundingRectangle();
+            if (!isVisibleOnScreen(enemyBounds, panelWidth, panelHeight, world)) {
+                continue;
+            }
+
+            int healthBarWidth = enemy instanceof BossEnemy
+                ? Math.max(1, (int) Math.round(enemyBounds.getWidth()))
+                : ENEMY_HEALTH_BAR_WIDTH;
+            drawHealthBar(
+                g2,
+                enemyBounds,
+                world,
+                panelWidth,
+                panelHeight,
+                healthBarWidth,
+                enemy.getCurrentHealth(),
+                enemy.getMaxHealth()
+            );
+        }
+    }
+
+    private void drawHealthBar(Graphics2D g2, Rectangle2D.Double worldBounds, GameWorld world,
+                               int panelWidth, int panelHeight, int barWidth,
+                               int currentHealth, int maxHealth) {
+        if (worldBounds == null || maxHealth <= 0 || barWidth <= 0) {
+            return;
+        }
+
+        int screenX = (int) Math.round(worldBounds.getX() - world.getCameraX());
+        int screenY = (int) Math.round(worldBounds.getY() - world.getCameraY());
+        int entityWidth = Math.max(1, (int) Math.round(worldBounds.getWidth()));
+        int barX = screenX + (entityWidth - barWidth) / 2;
+        int barY = screenY - HEALTH_BAR_VERTICAL_OFFSET - HEALTH_BAR_HEIGHT;
+
+        if (barX + barWidth < 0 || barX > panelWidth || barY + HEALTH_BAR_HEIGHT < 0 || barY > panelHeight) {
+            return;
+        }
+
+        float healthRatio = Math.max(0.0f, Math.min(1.0f, currentHealth / (float) maxHealth));
+        int fillWidth = Math.round(barWidth * healthRatio);
+
+        g2.setColor(new Color(35, 35, 35, 220));
+        g2.fillRoundRect(barX, barY, barWidth, HEALTH_BAR_HEIGHT, 8, 8);
+
+        if (fillWidth > 0) {
+            g2.setColor(new Color(210, 60, 60));
+            g2.fillRoundRect(barX, barY, fillWidth, HEALTH_BAR_HEIGHT, 8, 8);
+        }
+
+        g2.setColor(Color.WHITE);
+        g2.drawRoundRect(
+            barX - HEALTH_BAR_BORDER_THICKNESS / 2,
+            barY - HEALTH_BAR_BORDER_THICKNESS / 2,
+            barWidth + HEALTH_BAR_BORDER_THICKNESS - 1,
+            HEALTH_BAR_HEIGHT + HEALTH_BAR_BORDER_THICKNESS - 1,
+            8,
+            8
+        );
     }
 }
