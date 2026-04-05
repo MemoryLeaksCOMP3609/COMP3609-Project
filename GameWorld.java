@@ -1,5 +1,6 @@
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.Random;
 
 public class GameWorld {
@@ -30,6 +31,9 @@ public class GameWorld {
     private ArrayList<Enemy> enemies;
     private ArrayList<Projectile> projectiles;
     private ArrayList<DroppedCrystal> droppedCrystals;
+    private boolean bossPhaseOneSpawned;
+    private boolean bossPhaseTwoSpawned;
+    private boolean bossPhaseThreeSpawned;
     private int cameraX;
     private int cameraY;
     private int viewportWidth;
@@ -59,6 +63,9 @@ public class GameWorld {
         this.enemies = new ArrayList<Enemy>();
         this.projectiles = new ArrayList<Projectile>();
         this.droppedCrystals = new ArrayList<DroppedCrystal>();
+        this.bossPhaseOneSpawned = false;
+        this.bossPhaseTwoSpawned = false;
+        this.bossPhaseThreeSpawned = false;
         this.cameraX = 0;
         this.cameraY = 0;
         this.viewportWidth = worldWidth;
@@ -78,6 +85,9 @@ public class GameWorld {
         projectiles = new ArrayList<Projectile>();
         droppedCrystals = new ArrayList<DroppedCrystal>();
         enemySpawner.reset();
+        bossPhaseOneSpawned = false;
+        bossPhaseTwoSpawned = false;
+        bossPhaseThreeSpawned = false;
         cameraX = 0;
         cameraY = 0;
     }
@@ -196,6 +206,96 @@ public class GameWorld {
 
     public EnemySpawner getEnemySpawner() {
         return enemySpawner;
+    }
+
+    public boolean activateTestEnemySpawn(TestEnemySpawnType spawnType) {
+        if (spawnType == null) {
+            return false;
+        }
+
+        enemySpawner.setActiveSpawnType(spawnType);
+        purgeEnemiesExcept(spawnType);
+        clearEnemyProjectiles();
+        return true;
+    }
+
+    public boolean spawnTestBoss(TestBossSpawnType bossType) {
+        if (player == null || bossType == null || hasBossSpawned(bossType)) {
+            return false;
+        }
+
+        purgeAllEnemies();
+        clearEnemyProjectiles();
+
+        int spawnX = clamp(player.getWorldX() + 220, 0, worldWidth - 250);
+        int spawnY = clamp(player.getWorldY(), 0, worldHeight - 250);
+        enemies.add(bossType.createBoss(spawnX, spawnY));
+        markBossSpawned(bossType);
+        return true;
+    }
+
+    public boolean hasBossSpawned(TestBossSpawnType bossType) {
+        if (bossType == null) {
+            return false;
+        }
+
+        switch (bossType) {
+            case PHASE_1:
+                return bossPhaseOneSpawned;
+            case PHASE_2:
+                return bossPhaseTwoSpawned;
+            case PHASE_3:
+                return bossPhaseThreeSpawned;
+            default:
+                return false;
+        }
+    }
+
+    private void markBossSpawned(TestBossSpawnType bossType) {
+        switch (bossType) {
+            case PHASE_1:
+                bossPhaseOneSpawned = true;
+                break;
+            case PHASE_2:
+                bossPhaseTwoSpawned = true;
+                break;
+            case PHASE_3:
+                bossPhaseThreeSpawned = true;
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void purgeAllEnemies() {
+        Iterator<Enemy> iterator = enemies.iterator();
+        while (iterator.hasNext()) {
+            iterator.next();
+            iterator.remove();
+        }
+    }
+
+    private void purgeEnemiesExcept(TestEnemySpawnType allowedType) {
+        Iterator<Enemy> iterator = enemies.iterator();
+        while (iterator.hasNext()) {
+            Enemy enemy = iterator.next();
+            if (allowedType == null || !allowedType.matches(enemy)) {
+                iterator.remove();
+            }
+        }
+    }
+
+    private void clearEnemyProjectiles() {
+        Iterator<Projectile> iterator = projectiles.iterator();
+        while (iterator.hasNext()) {
+            if (iterator.next().isEnemyOwned()) {
+                iterator.remove();
+            }
+        }
+    }
+
+    private int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(value, max));
     }
 
     public void spawnCrystalDrop(Enemy enemy) {
