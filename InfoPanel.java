@@ -1,69 +1,36 @@
-import java.awt.*;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.Graphics2D;
 import java.text.DecimalFormat;
-import javax.swing.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Information display panel showing player stats and run state.
+ * Lightweight HUD model/renderer for player stats in fullscreen mode.
  */
-public class InfoPanel extends JPanel {
-    private final JTextField healthTF;
-    private final JTextField levelTF;
-    private final JTextField experienceTF;
-    private final JTextField speedTF;
-    private final JTextField damageTF;
-    private final JTextField fireRateTF;
-    private final JTextField regenTF;
-    private final JTextField fpsTF;
-    private final JTextField effectsTF;
-
+public class InfoPanel {
     private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.00");
 
+    private String healthText;
+    private String levelText;
+    private String experienceText;
+    private String speedText;
+    private String damageText;
+    private String fireRateText;
+    private String regenText;
+    private String fpsText;
+    private String effectText;
+
     public InfoPanel() {
-        setLayout(new GridLayout(2, 9));
-        setPreferredSize(new Dimension(800, 60));
-        setBackground(Color.DARK_GRAY);
-
-        addLabel("Health:");
-        healthTF = addField(Color.PINK, "100 / 100");
-
-        addLabel("Level:");
-        levelTF = addField(Color.ORANGE, "1");
-
-        addLabel("XP:");
-        experienceTF = addField(Color.CYAN, "0 / 100");
-
-        addLabel("Speed:");
-        speedTF = addField(Color.YELLOW, "5");
-
-        addLabel("Damage:");
-        damageTF = addField(Color.GREEN, "1.00x");
-
-        addLabel("Fire Rate:");
-        fireRateTF = addField(new Color(180, 255, 180), "1.00x");
-
-        addLabel("Regen:");
-        regenTF = addField(new Color(200, 255, 220), "1 / 5s");
-
-        addLabel("FPS:");
-        fpsTF = addField(Color.LIGHT_GRAY, "0");
-
-        addLabel("Effect:");
-        effectsTF = addField(Color.WHITE, "None");
-    }
-
-    private void addLabel(String text) {
-        JLabel label = new JLabel(text);
-        label.setForeground(Color.WHITE);
-        add(label);
-    }
-
-    private JTextField addField(Color background, String initialValue) {
-        JTextField field = new JTextField(initialValue);
-        field.setEditable(false);
-        field.setForeground(Color.BLACK);
-        field.setBackground(background);
-        add(field);
-        return field;
+        healthText = "100 / 100";
+        levelText = "1";
+        experienceText = "0 / 100";
+        speedText = "5";
+        damageText = "1.00x";
+        fireRateText = "1.00x";
+        regenText = "1 / 5s";
+        fpsText = "0";
+        effectText = "None";
     }
 
     public void updatePlayerStats(Player player) {
@@ -71,34 +38,73 @@ public class InfoPanel extends JPanel {
             return;
         }
 
-        setFieldTextIfChanged(healthTF, player.getHealth() + " / " + player.getMaxHealth());
-        setFieldTextIfChanged(levelTF, String.valueOf(player.getLevel()));
-        if (player.isMaxLevel()) {
-            setFieldTextIfChanged(experienceTF, "MAX");
-        } else {
-            setFieldTextIfChanged(experienceTF, player.getExperience() + " / " + player.getExperienceToNextLevel());
-        }
-        setFieldTextIfChanged(speedTF, String.valueOf(player.getMoveSpeed()));
-        setFieldTextIfChanged(damageTF, DECIMAL_FORMAT.format(player.getDamageMultiplier()) + "x");
-        setFieldTextIfChanged(fireRateTF, DECIMAL_FORMAT.format(player.getFireRateMultiplier()) + "x");
-        setFieldTextIfChanged(regenTF, player.getHealthRegenPerInterval() + " / 5s");
+        healthText = player.getHealth() + " / " + player.getMaxHealth();
+        levelText = String.valueOf(player.getLevel());
+        experienceText = player.isMaxLevel()
+            ? "MAX"
+            : player.getExperience() + " / " + player.getExperienceToNextLevel();
+        speedText = String.valueOf(player.getMoveSpeed());
+        damageText = DECIMAL_FORMAT.format(player.getDamageMultiplier()) + "x";
+        fireRateText = DECIMAL_FORMAT.format(player.getFireRateMultiplier()) + "x";
+        regenText = player.getHealthRegenPerInterval() + " / 5s";
     }
 
     public void updateFPS(int fps) {
-        setFieldTextIfChanged(fpsTF, String.valueOf(fps));
+        fpsText = String.valueOf(fps);
     }
 
     public void updateActiveEffects(String effectName) {
         if (effectName == null || effectName.isEmpty()) {
-            setFieldTextIfChanged(effectsTF, "None");
+            effectText = "None";
         } else {
-            setFieldTextIfChanged(effectsTF, effectName);
+            effectText = effectName;
         }
     }
 
-    private void setFieldTextIfChanged(JTextField field, String value) {
-        if (!value.equals(field.getText())) {
-            field.setText(value);
+    public void drawHud(Graphics2D g2, int x, int y) {
+        String[] lines = getHudLines();
+        if (lines.length == 0) {
+            return;
         }
+
+        Font oldFont = g2.getFont();
+        g2.setFont(new Font("Arial", Font.BOLD, 18));
+        int lineHeight = g2.getFontMetrics().getHeight();
+        int contentWidth = 0;
+        for (String line : lines) {
+            contentWidth = Math.max(contentWidth, g2.getFontMetrics().stringWidth(line));
+        }
+
+        int boxWidth = contentWidth + 32;
+        int boxHeight = 18 + (lineHeight * lines.length) + 12;
+
+        g2.setColor(new Color(0, 0, 0, 150));
+        g2.fillRoundRect(x, y, boxWidth, boxHeight, 18, 18);
+        g2.setColor(new Color(255, 255, 255, 210));
+        g2.drawRoundRect(x, y, boxWidth, boxHeight, 18, 18);
+
+        int textX = x + 16;
+        int textY = y + 12 + g2.getFontMetrics().getAscent();
+        g2.setColor(Color.WHITE);
+        for (String line : lines) {
+            g2.drawString(line, textX, textY);
+            textY += lineHeight;
+        }
+
+        g2.setFont(oldFont);
+    }
+
+    public String[] getHudLines() {
+        List<String> lines = new ArrayList<String>();
+        lines.add("Health: " + healthText);
+        lines.add("Level: " + levelText);
+        lines.add("XP: " + experienceText);
+        lines.add("Speed: " + speedText);
+        lines.add("Damage: " + damageText);
+        lines.add("Fire Rate: " + fireRateText);
+        lines.add("Regen: " + regenText);
+        lines.add("FPS: " + fpsText);
+        lines.add("Effect: " + effectText);
+        return lines.toArray(new String[0]);
     }
 }
