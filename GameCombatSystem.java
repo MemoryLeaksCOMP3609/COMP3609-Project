@@ -45,14 +45,17 @@ public class GameCombatSystem {
 
             enemy.updateDamageFlash(deltaTimeMs);
             enemy.updateAttackCooldown(deltaTimeMs);
-            enemy.update(deltaTimeMs);
-            double distanceToPlayer = getDistance(enemy.getCenterX(), enemy.getCenterY(), player.getCenterX(), player.getCenterY());
 
             if (enemy instanceof BatEnemy) {
+                double distanceToPlayer = getDistance(enemy.getCenterX(), enemy.getCenterY(), player.getCenterX(), player.getCenterY());
                 updateBatEnemy(enemy, player, deltaTimeMs, distanceToPlayer);
+            } else if (enemy instanceof SkeletonEnemy) {
+                ((SkeletonEnemy) enemy).updateBehavior(player, deltaTimeMs);
             } else {
                 enemy.moveToward(player.getCenterX(), player.getCenterY(), deltaTimeMs);
             }
+
+            enemy.update(deltaTimeMs);
         }
     }
 
@@ -92,6 +95,7 @@ public class GameCombatSystem {
         Rectangle2D.Double playerBounds = player.getBoundingRectangle();
         handleCollectibleCollisions(player, playerData, playerBounds, queueLevelUpChoices);
         handleCrystalCollisions(playerData, playerBounds, queueLevelUpChoices);
+        handleSkeletonDashCollisions(player, playerData, playerBounds, onPlayerDeath);
         handleProjectileCollisions(player, playerData, onPlayerDeath);
     }
 
@@ -157,6 +161,34 @@ public class GameCombatSystem {
                     }
                     projectile.markImpact();
                     break;
+                }
+            }
+        }
+    }
+
+    private void handleSkeletonDashCollisions(PlayerSprite player, Player playerData,
+                                              Rectangle2D.Double playerBounds, Runnable onPlayerDeath) {
+        if (playerData == null) {
+            return;
+        }
+
+        for (Enemy enemy : world.getEnemies()) {
+            if (!(enemy instanceof SkeletonEnemy)) {
+                continue;
+            }
+
+            SkeletonEnemy skeleton = (SkeletonEnemy) enemy;
+            if (!skeleton.canDamagePlayerOnDash()) {
+                continue;
+            }
+
+            if (PixelCollision.intersects(playerBounds, player.getCurrentBufferedImage(),
+                skeleton.getBoundingRectangle(), skeleton.getCurrentBufferedImage())) {
+                playerData.takeDamage(skeleton.getContactDamage());
+                player.triggerDamageFlash();
+                skeleton.markDashHitApplied();
+                if (playerData.getHealth() <= 0) {
+                    onPlayerDeath.run();
                 }
             }
         }

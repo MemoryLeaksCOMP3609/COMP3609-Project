@@ -1,11 +1,11 @@
-import java.awt.Graphics2D;
 import java.awt.Color;
+import java.awt.Graphics2D;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 
 public abstract class Enemy extends Sprite {
-    private static final int DEFAULT_FRAME_COUNT = 5;
+    private static final int DEFAULT_FRAME_COUNT = 4;
     private static final double MOVEMENT_REFERENCE_FRAME_MS = 40.0;
     private static final long DAMAGE_FLASH_DURATION_MS = 120;
 
@@ -32,6 +32,7 @@ public abstract class Enemy extends Sprite {
     protected double renderScale;
     protected long damageFlashRemainingMs;
     protected boolean facingLeft;
+    protected boolean spriteFacesLeftByDefault;
     protected BufferedImage cachedBaseFrame;
     protected BufferedImage cachedDamageFlashFrame;
 
@@ -54,6 +55,7 @@ public abstract class Enemy extends Sprite {
         this.renderScale = 1.0;
         this.damageFlashRemainingMs = 0;
         this.facingLeft = true;
+        this.spriteFacesLeftByDefault = true;
         this.cachedBaseFrame = null;
         this.cachedDamageFlashFrame = null;
     }
@@ -63,15 +65,10 @@ public abstract class Enemy extends Sprite {
     }
 
     protected Animation loadStripAnimation(String imagePath, long frameDuration, boolean loop, int frameCount) {
-        BufferedImage spriteSheet = ImageManager.loadBufferedImage(imagePath);
-        if (spriteSheet == null) {
+        BufferedImage[] frames = loadStripFrames(imagePath, frameCount);
+        if (frames.length == 0) {
             return null;
         }
-
-        int frameWidth = spriteSheet.getWidth() / frameCount;
-        int frameHeight = spriteSheet.getHeight();
-        StripAnimation stripAnimation = new StripAnimation(frameWidth, frameHeight, frameCount);
-        BufferedImage[] frames = stripAnimation.extractFramesFromRow(spriteSheet, 0);
         Animation animation = new Animation(loop);
         for (BufferedImage frame : frames) {
             animation.addFrame(frame, frameDuration);
@@ -82,6 +79,18 @@ public abstract class Enemy extends Sprite {
             image = frames[0];
         }
         return animation;
+    }
+
+    protected BufferedImage[] loadStripFrames(String imagePath, int frameCount) {
+        BufferedImage spriteSheet = ImageManager.loadBufferedImage(imagePath);
+        if (spriteSheet == null) {
+            return new BufferedImage[0];
+        }
+
+        int frameWidth = spriteSheet.getWidth() / frameCount;
+        int frameHeight = spriteSheet.getHeight();
+        StripAnimation stripAnimation = new StripAnimation(frameWidth, frameHeight, frameCount);
+        return stripAnimation.extractFramesFromRow(spriteSheet, 0);
     }
 
     protected void setAnimationForState(EnemyState nextState) {
@@ -146,14 +155,22 @@ public abstract class Enemy extends Sprite {
         double directionX = deltaX / distance;
         double directionY = deltaY / distance;
 
-        if (Math.abs(directionX) > 0.001) {
-            facingLeft = directionX < 0;
-        }
+        updateFacingDirection(directionX);
 
         worldX += (int) Math.round(directionX * moveDistance);
         worldY += (int) Math.round(directionY * moveDistance);
 
         setAnimationForState(EnemyState.MOVING);
+    }
+
+    protected void faceToward(int targetX) {
+        updateFacingDirection(targetX - worldX);
+    }
+
+    protected void updateFacingDirection(double directionX) {
+        if (Math.abs(directionX) > 0.001) {
+            facingLeft = directionX < 0;
+        }
     }
 
     public void attack() {
@@ -191,7 +208,7 @@ public abstract class Enemy extends Sprite {
             if (damageFlashRemainingMs > 0) {
                 frameToDraw = getDamageFlashFrame(currentFrame);
             }
-            if (facingLeft) {
+            if (facingLeft == spriteFacesLeftByDefault) {
                 g2.drawImage(frameToDraw, screenX, screenY, width, height, null);
             } else {
                 AffineTransform originalTransform = g2.getTransform();
