@@ -1,21 +1,25 @@
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 public class LevelUpManager {
     private int pendingLevelUpChoices;
     private boolean levelUpDialogOpen;
+    private boolean pausedBeforeDialog;
+    private ArrayList<PlayerUpgradeOption> currentChoices;
 
     public LevelUpManager() {
         pendingLevelUpChoices = 0;
         levelUpDialogOpen = false;
+        pausedBeforeDialog = false;
+        currentChoices = new ArrayList<PlayerUpgradeOption>();
     }
 
     public void reset() {
         pendingLevelUpChoices = 0;
         levelUpDialogOpen = false;
+        pausedBeforeDialog = false;
+        currentChoices.clear();
     }
 
     public void queueChoices(int levelsGained, GameSessionState sessionState) {
@@ -24,12 +28,10 @@ public class LevelUpManager {
         }
 
         pendingLevelUpChoices += levelsGained;
-        sessionState.setActiveEffectName("Level Up");
     }
 
-    public void processPendingChoices(JPanel panel, GameSessionState sessionState, GameWorld world,
-                                      GameInputState inputState, SoundManager soundManager,
-                                      InfoPanel infoPanel) {
+    public void processPendingChoices(GameSessionState sessionState, GameWorld world,
+                                      GameInputState inputState, SoundManager soundManager) {
         if (pendingLevelUpChoices <= 0 || levelUpDialogOpen || !sessionState.isGameRunning() || sessionState.isGameOver()) {
             return;
         }
@@ -40,74 +42,97 @@ public class LevelUpManager {
             return;
         }
 
+        prepareChoices(playerData, sessionState, inputState, soundManager, world);
+    }
+
+    public boolean isChoiceActive() {
+        return levelUpDialogOpen;
+    }
+
+    public String getPromptMessage(Player playerData) {
+        if (playerData == null) {
+            return "Choose an upgrade";
+        }
+
+        if (playerData.isMaxLevel()) {
+            return "You reached the max level.";
+        }
+
+        return "Level " + playerData.getLevel() + " - choose a stat to upgrade";
+    }
+
+    public List<PlayerUpgradeOption> getCurrentChoices() {
+        return Collections.unmodifiableList(currentChoices);
+    }
+
+    public void applyChoice(int selectedIndex, GameSessionState sessionState, GameWorld world,
+                            GameInputState inputState, SoundManager soundManager,
+                            InfoPanel infoPanel) {
+        if (!levelUpDialogOpen || selectedIndex < 0 || selectedIndex >= currentChoices.size()) {
+            return;
+        }
+
+        Player playerData = world.getPlayerData();
+        if (playerData == null) {
+            closeChoiceSession(sessionState, world, inputState, soundManager);
+            pendingLevelUpChoices = 0;
+            return;
+        }
+
+        PlayerUpgradeOption selectedUpgrade = currentChoices.get(selectedIndex);
+        selectedUpgrade.apply(playerData);
+        pendingLevelUpChoices--;
+        if (infoPanel != null) {
+            infoPanel.updatePlayerStats(playerData);
+        }
+
+        currentChoices.clear();
+
+        if (pendingLevelUpChoices > 0 && sessionState.isGameRunning() && !sessionState.isGameOver()) {
+            prepareChoices(playerData, sessionState, inputState, soundManager, world);
+            return;
+        }
+
+        closeChoiceSession(sessionState, world, inputState, soundManager);
+    }
+
+    private void prepareChoices(Player playerData, GameSessionState sessionState,
+                                GameInputState inputState, SoundManager soundManager,
+                                GameWorld world) {
+        currentChoices.clear();
+        for (PlayerUpgradeOption option : PlayerUpgradeOption.values()) {
+            if (option.isAvailable(playerData)) {
+                currentChoices.add(option);
+            }
+        }
+        Collections.shuffle(currentChoices);
+
+        while (currentChoices.size() > 3) {
+            currentChoices.remove(currentChoices.size() - 1);
+        }
+
         levelUpDialogOpen = true;
-        boolean wasPaused = sessionState.isGamePaused();
+        pausedBeforeDialog = sessionState.isGamePaused();
         sessionState.setGamePaused(true);
         soundManager.stopClip("background");
-
-        try {
-            while (pendingLevelUpChoices > 0 && sessionState.isGameRunning() && !sessionState.isGameOver()) {
-                PlayerUpgradeOption selectedUpgrade = promptForLevelUpChoice(panel, playerData);
-                if (selectedUpgrade == null) {
-                    continue;
-                }
-
-                selectedUpgrade.apply(playerData);
-                pendingLevelUpChoices--;
-                sessionState.setActiveEffectName(selectedUpgrade.getDisplayName(playerData));
-                if (infoPanel != null) {
-                    infoPanel.updatePlayerStats(playerData);
-                }
-            }
-        } finally {
-            levelUpDialogOpen = false;
-            inputState.clearMovement();
-            if (world.getPlayer() != null) {
-                world.getPlayer().setIdle();
-            }
-            sessionState.setGamePaused(wasPaused);
-            if (!sessionState.isGameOver() && sessionState.isGameRunning() && !sessionState.isGamePaused()) {
-                soundManager.playBackgroundMusic();
-            }
-            panel.requestFocusInWindow();
+        inputState.clearMovement();
+        if (world.getPlayer() != null) {
+            world.getPlayer().setIdle();
         }
     }
 
-    private PlayerUpgradeOption promptForLevelUpChoice(JPanel panel, Player playerData) {
-        ArrayList<PlayerUpgradeOption> choices = new ArrayList<PlayerUpgradeOption>();
-        for (PlayerUpgradeOption option : PlayerUpgradeOption.values()) {
-            if (option.isAvailable(playerData)) {
-                choices.add(option);
-            }
+    private void closeChoiceSession(GameSessionState sessionState, GameWorld world,
+                                    GameInputState inputState, SoundManager soundManager) {
+        levelUpDialogOpen = false;
+        currentChoices.clear();
+        inputState.clearMovement();
+        if (world.getPlayer() != null) {
+            world.getPlayer().setIdle();
         }
-        Collections.shuffle(choices);
-
-        int choiceCount = Math.min(3, choices.size());
-        String[] labels = new String[choiceCount];
-        for (int i = 0; i < choiceCount; i++) {
-            labels[i] = choices.get(i).getDisplayName(playerData);
-        }
-
-        String title = "Level Up";
-        String message = playerData.isMaxLevel()
-            ? "You reached the max level."
-            : "Level " + playerData.getLevel() + " - choose a stat to upgrade";
-
-        while (true) {
-            int selectedIndex = JOptionPane.showOptionDialog(
-                SwingUtilities.getWindowAncestor(panel),
-                message,
-                title,
-                JOptionPane.DEFAULT_OPTION,
-                JOptionPane.PLAIN_MESSAGE,
-                null,
-                labels,
-                labels[0]
-            );
-
-            if (selectedIndex >= 0 && selectedIndex < choiceCount) {
-                return choices.get(selectedIndex);
-            }
+        sessionState.setGamePaused(pausedBeforeDialog);
+        pausedBeforeDialog = false;
+        if (!sessionState.isGameOver() && sessionState.isGameRunning() && !sessionState.isGamePaused()) {
+            soundManager.playBackgroundMusic();
         }
     }
 }

@@ -1,229 +1,260 @@
-import java.awt.*;
-import java.awt.event.*;
-import javax.swing.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
+import java.awt.Rectangle;
+import java.awt.Toolkit;
+import java.awt.Window;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionListener;
+import java.awt.image.BufferStrategy;
+import java.awt.image.BufferedImage;
+import java.util.List;
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
 
-/**
- * Main game window frame that contains InfoPanel and GamePanel.
- * Handles keyboard input for player movement and game controls.
- */
-public class GameWindow extends JFrame 
-        implements ActionListener, KeyListener {
-    private static final EnemySpawnType[] STANDARD_ENEMY_BUTTON_ORDER = {
-        EnemySpawnType.BAT,
-        EnemySpawnType.NORMAL_SKELETON,
-        EnemySpawnType.TOXIC_SKELETON,
-        EnemySpawnType.NORMAL_GHOST,
-        EnemySpawnType.DARK_GHOST,
-        EnemySpawnType.FROST_GHOST
-    };
-    private static final EnemySpawnType[] BOSS_BUTTON_ORDER = {
-        EnemySpawnType.BOSS_PHASE_1,
-        EnemySpawnType.BOSS_PHASE_2,
-        EnemySpawnType.BOSS_PHASE_3
-    };
-    
-    // UI Components
-    private Container c;
-    private JPanel mainPanel;
-    private JPanel buttonPanel;
-    private JPanel enemyButtonPanel;
-    private JPanel bossButtonPanel;
-    private GamePanel gamePanel;
-    private InfoPanel infoPanel;
-    
-    // Buttons
-    private JButton startB;
-    private JButton pauseB;
-    private JButton exitB;
-    private JToggleButton[] standardEnemyTypeButtons;
-    private JToggleButton[] bossTypeButtons;
-    
-    // Managers
-    private SoundManager soundManager;
-    
+public class GameWindow extends JFrame implements ActionListener, KeyListener, MouseListener, MouseMotionListener {
+    private static final int NUM_BUFFERS = 2;
+    private static final Dimension LAUNCHER_SIZE = new Dimension(900, 650);
+    private static final int BUTTON_WIDTH = 120;
+    private static final int BUTTON_HEIGHT = 42;
+    private static final int BUTTON_GAP = 12;
+    private static final int BUTTON_MARGIN = 24;
+
+    private final JPanel launcherPanel;
+    private final JButton launcherStartButton;
+    private final JButton launcherExitButton;
+    private final InfoPanel infoPanel;
+    private final GamePanel gamePanel;
+    private final GraphicsDevice device;
+
+    private BufferStrategy bufferStrategy;
+    private BufferedImage screenImage;
+    private boolean fullscreenActive;
+    private boolean weaponSelectionActive;
+    private boolean exitConfirmationActive;
+    private boolean exitConfirmationPausedGame;
+    private Rectangle pauseButtonBounds;
+    private Rectangle exitButtonBounds;
+    private Rectangle exitConfirmButtonBounds;
+    private Rectangle exitCancelButtonBounds;
+    private boolean mouseOverPauseButton;
+    private boolean mouseOverExitButton;
+    private boolean mouseOverExitConfirmButton;
+    private boolean mouseOverExitCancelButton;
+    private Rectangle[] weaponOptionBounds;
+    private Rectangle[] levelUpOptionBounds;
+    private final WeaponType[] weaponOptions;
+    private boolean[] weaponOptionHovered;
+    private boolean[] levelUpOptionHovered;
+
     public GameWindow() {
-        setTitle("Coin Collector");
-        setSize(800, 700);
-        
-        soundManager = SoundManager.getInstance();
-        
-        mainPanel = new JPanel();
-        mainPanel.setLayout(new BorderLayout());
-        mainPanel.setBackground(Color.BLACK);
-        mainPanel.setFocusable(true);
-        
+        super("Coin Collector");
+
+        device = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
         infoPanel = new InfoPanel();
-        
         gamePanel = new GamePanel(infoPanel);
-        gamePanel.setFocusable(true);
-        
-        createButtonPanel();
-        
-        // Add panels to main panel
-        mainPanel.add(infoPanel, BorderLayout.NORTH);
-        mainPanel.add(gamePanel, BorderLayout.CENTER);
-        mainPanel.add(buttonPanel, BorderLayout.SOUTH);
-        
-        // Set up keyboard input
-        mainPanel.addKeyListener(this);
-        gamePanel.addKeyListener(this);
+        fullscreenActive = false;
+        weaponSelectionActive = false;
+        exitConfirmationActive = false;
+        exitConfirmationPausedGame = false;
+        weaponOptions = WeaponType.values();
+        weaponOptionBounds = new Rectangle[weaponOptions.length];
+        weaponOptionHovered = new boolean[weaponOptions.length];
+        levelUpOptionBounds = new Rectangle[3];
+        levelUpOptionHovered = new boolean[3];
+
+        launcherPanel = new JPanel();
+        launcherPanel.setLayout(new BoxLayout(launcherPanel, BoxLayout.Y_AXIS));
+        launcherPanel.setBackground(Color.BLACK);
+        launcherPanel.setBorder(BorderFactory.createEmptyBorder(120, 120, 120, 120));
+
+        JLabel titleLabel = new JLabel("Coin Collector");
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 42));
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel subtitleLabel = new JLabel("Press Start to launch the game in fullscreen");
+        subtitleLabel.setFont(new Font("Arial", Font.PLAIN, 18));
+        subtitleLabel.setForeground(Color.LIGHT_GRAY);
+        subtitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        launcherStartButton = new JButton("Start Game");
+        launcherStartButton.setActionCommand("LAUNCH_GAME");
+        launcherStartButton.addActionListener(this);
+        launcherStartButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        launcherExitButton = new JButton("Exit");
+        launcherExitButton.setActionCommand("EXIT_LAUNCHER");
+        launcherExitButton.addActionListener(this);
+        launcherExitButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        launcherPanel.add(titleLabel);
+        launcherPanel.add(Box.createVerticalStrut(16));
+        launcherPanel.add(subtitleLabel);
+        launcherPanel.add(Box.createVerticalStrut(32));
+        launcherPanel.add(launcherStartButton);
+        launcherPanel.add(Box.createVerticalStrut(12));
+        launcherPanel.add(launcherExitButton);
+
+        setLayout(new BorderLayout());
+        add(launcherPanel, BorderLayout.CENTER);
         addKeyListener(this);
-        
-        // Add main panel to window
-        c = getContentPane();
-        c.add(mainPanel);
-        
-        // Set window properties
-        setResizable(true);
+        addMouseListener(this);
+        addMouseMotionListener(this);
+
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setResizable(false);
+        setPreferredSize(LAUNCHER_SIZE);
+        pack();
+        setLocationRelativeTo(null);
         setVisible(true);
-        requestGameFocus();
-    }
-    
-    private void createButtonPanel() {
-        buttonPanel = new JPanel();
-        buttonPanel.setBackground(Color.DARK_GRAY);
-        buttonPanel.setLayout(new BorderLayout());
-
-        JPanel controlButtonPanel = new JPanel();
-        controlButtonPanel.setBackground(Color.DARK_GRAY);
-        
-        startB = new JButton("Start");
-        pauseB = new JButton("Pause");
-        exitB = new JButton("Exit");
-        
-        startB.addActionListener(this);
-        pauseB.addActionListener(this);
-        exitB.addActionListener(this);
-        
-        controlButtonPanel.add(startB);
-        controlButtonPanel.add(pauseB);
-        controlButtonPanel.add(exitB);
-
-        JPanel spawnSelectionPanel = new JPanel();
-        spawnSelectionPanel.setLayout(new GridLayout(2, 1, 0, 4));
-        spawnSelectionPanel.setBackground(Color.DARK_GRAY);
-
-        enemyButtonPanel = createSpawnButtonRow("Enemies", STANDARD_ENEMY_BUTTON_ORDER, false);
-        bossButtonPanel = createSpawnButtonRow("Bosses", BOSS_BUTTON_ORDER, true);
-        spawnSelectionPanel.add(enemyButtonPanel);
-        spawnSelectionPanel.add(bossButtonPanel);
-
-        buttonPanel.add(controlButtonPanel, BorderLayout.NORTH);
-        buttonPanel.add(spawnSelectionPanel, BorderLayout.SOUTH);
+        launcherStartButton.requestFocusInWindow();
     }
 
-    private JPanel createSpawnButtonRow(String title, EnemySpawnType[] buttonOrder, boolean bossRow) {
-        JPanel rowPanel = new JPanel(new BorderLayout());
-        rowPanel.setBackground(Color.DARK_GRAY);
-
-        JLabel label = new JLabel(title + ":");
-        label.setForeground(Color.WHITE);
-        rowPanel.add(label, BorderLayout.WEST);
-
-        JPanel buttonRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 6, 4));
-        buttonRow.setBackground(Color.DARK_GRAY);
-
-        ButtonGroup enemyButtonGroup = new ButtonGroup();
-        JToggleButton[] buttons = new JToggleButton[buttonOrder.length];
-
-        for (int i = 0; i < buttonOrder.length; i++) {
-            EnemySpawnType enemyType = buttonOrder[i];
-            JToggleButton button = new JToggleButton(enemyType.getDisplayName());
-            button.setActionCommand(enemyType.name());
-            button.addActionListener(this);
-            if (enemyType == gamePanel.getSelectedEnemyType()) {
-                button.setSelected(true);
-            }
-
-            enemyButtonGroup.add(button);
-            buttonRow.add(button);
-            buttons[i] = button;
-        }
-
-        if (bossRow) {
-            bossTypeButtons = buttons;
-        } else {
-            standardEnemyTypeButtons = buttons;
-        }
-
-        rowPanel.add(buttonRow, BorderLayout.CENTER);
-        return rowPanel;
-    }
-    
-    private void updateInfoPanel() {
-        infoPanel.updatePlayerStats(gamePanel.getPlayerData());
-        infoPanel.updateFPS(gamePanel.getFPS());
-        infoPanel.updateActiveEffects(gamePanel.getActiveEffectName());
-    }
-    
     @Override
     public void actionPerformed(ActionEvent e) {
         String command = e.getActionCommand();
-        
-        if (command.equals(startB.getText())) {
-            if (gamePanel.isGameOver()) {
-                WeaponType selectedWeapon = promptForWeaponChoice();
-                if (selectedWeapon == null) {
-                    requestGameFocus();
-                    return;
-                }
-                gamePanel.setSelectedWeapon(selectedWeapon);
-                gamePanel.resetGame();
-            } else if (!gamePanel.isGameRunning()) {
-                WeaponType selectedWeapon = promptForWeaponChoice();
-                if (selectedWeapon == null) {
-                    requestGameFocus();
-                    return;
-                }
-                gamePanel.setSelectedWeapon(selectedWeapon);
-                gamePanel.startGame();
-            }
-            requestGameFocus();
-        }
-        
-        if (command.equals(pauseB.getText())) {
-            gamePanel.pauseGame();
-            if (gamePanel.isGamePaused()) {
-                pauseB.setText("Resume");
-            } else {
-                pauseB.setText("Pause");
-            }
-            requestGameFocus();
-        }
-        
-        if (command.equals(exitB.getText())) {
-            System.exit(0);
-        }
 
-        EnemySpawnType selectedSpawnType = findSpawnTypeForCommand(command, STANDARD_ENEMY_BUTTON_ORDER);
-        if (selectedSpawnType == null) {
-            selectedSpawnType = findSpawnTypeForCommand(command, BOSS_BUTTON_ORDER);
-        }
-
-        if (selectedSpawnType != null) {
-            gamePanel.setSelectedEnemyType(selectedSpawnType);
-            requestGameFocus();
+        if ("LAUNCH_GAME".equals(command)) {
+            launchGame();
             return;
         }
-        
-        requestGameFocus();
+
+        if ("EXIT_LAUNCHER".equals(command)) {
+            closeApplication();
+        }
     }
 
-    private EnemySpawnType findSpawnTypeForCommand(String command, EnemySpawnType[] buttonOrder) {
-        for (EnemySpawnType enemyType : buttonOrder) {
-            if (command.equals(enemyType.name())) {
-                return enemyType;
-            }
-        }
-        return null;
+    private void launchGame() {
+        enterFullscreenMode();
+        gamePanel.setRenderCallback(this::renderScreen);
+        gamePanel.startLoop();
+        weaponSelectionActive = true;
+        renderScreen();
+        requestFocusInWindow();
     }
-    
+
+    private void enterFullscreenMode() {
+        if (fullscreenActive) {
+            return;
+        }
+
+        dispose();
+        getContentPane().removeAll();
+        setUndecorated(true);
+        setIgnoreRepaint(true);
+        setResizable(false);
+
+        if (!device.isFullScreenSupported()) {
+            throw new IllegalStateException("Full-screen exclusive mode is not supported on this system.");
+        }
+
+        device.setFullScreenWindow(this);
+        setVisible(true);
+
+        int width = Math.max(1, getWidth());
+        int height = Math.max(1, getHeight());
+        gamePanel.setViewportSize(width, height);
+        screenImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        updateOverlayButtonBounds(width);
+
+        try {
+            createBufferStrategy(NUM_BUFFERS);
+        } catch (IllegalStateException ex) {
+            throw new IllegalStateException("Unable to create fullscreen buffer strategy.", ex);
+        }
+
+        bufferStrategy = getBufferStrategy();
+        fullscreenActive = true;
+    }
+
+    private void renderScreen() {
+        if (!fullscreenActive || bufferStrategy == null) {
+            return;
+        }
+
+        int width = Math.max(1, getWidth());
+        int height = Math.max(1, getHeight());
+        if (screenImage == null || screenImage.getWidth() != width || screenImage.getHeight() != height) {
+            screenImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        }
+
+        gamePanel.setViewportSize(width, height);
+        updateOverlayButtonBounds(width);
+        updateChoiceBounds(width, height);
+
+        do {
+            do {
+                Graphics2D imageGraphics = screenImage.createGraphics();
+                try {
+                    imageGraphics.setColor(Color.BLACK);
+                    imageGraphics.fillRect(0, 0, width, height);
+                    gamePanel.renderToScreen(imageGraphics, width, height);
+                    drawHudOverlay(imageGraphics);
+                    drawOverlayButtons(imageGraphics);
+                    drawWeaponSelectionOverlay(imageGraphics, width, height);
+                    drawLevelUpOverlay(imageGraphics, width, height);
+                    drawExitConfirmationOverlay(imageGraphics, width, height);
+                } finally {
+                    imageGraphics.dispose();
+                }
+
+                Graphics graphics = bufferStrategy.getDrawGraphics();
+                try {
+                    graphics.drawImage(screenImage, 0, 0, width, height, null);
+                } finally {
+                    graphics.dispose();
+                }
+            } while (bufferStrategy.contentsRestored());
+
+            if (!bufferStrategy.contentsLost()) {
+                bufferStrategy.show();
+            }
+            Toolkit.getDefaultToolkit().sync();
+        } while (bufferStrategy.contentsLost());
+    }
+
     @Override
     public void keyPressed(KeyEvent e) {
         int keyCode = e.getKeyCode();
-        
-        // Arrow keys
+
+        if (keyCode == KeyEvent.VK_ESCAPE) {
+            if (fullscreenActive) {
+                if (exitConfirmationActive) {
+                    hideExitConfirmation();
+                } else {
+                    showExitConfirmation();
+                }
+            } else {
+                closeApplication();
+            }
+            return;
+        }
+
+        if (!fullscreenActive) {
+            return;
+        }
+
+        if (exitConfirmationActive || weaponSelectionActive || gamePanel.isLevelUpChoiceActive()) {
+            return;
+        }
+
         if (keyCode == KeyEvent.VK_LEFT || keyCode == KeyEvent.VK_A) {
             gamePanel.setLeftKeyPressed(true);
         }
@@ -236,13 +267,19 @@ public class GameWindow extends JFrame
         if (keyCode == KeyEvent.VK_DOWN || keyCode == KeyEvent.VK_S) {
             gamePanel.setDownKeyPressed(true);
         }
-        
+        if (keyCode == KeyEvent.VK_P) {
+            togglePause();
+        }
     }
-    
+
     @Override
     public void keyReleased(KeyEvent e) {
+        if (!fullscreenActive) {
+            return;
+        }
+
         int keyCode = e.getKeyCode();
-        
+
         if (keyCode == KeyEvent.VK_LEFT || keyCode == KeyEvent.VK_A) {
             gamePanel.setLeftKeyPressed(false);
         }
@@ -256,40 +293,403 @@ public class GameWindow extends JFrame
             gamePanel.setDownKeyPressed(false);
         }
     }
-    
+
     @Override
     public void keyTyped(KeyEvent e) {
-        // Not used
     }
 
-    private WeaponType promptForWeaponChoice() {
-        WeaponType[] options = WeaponType.values();
-        String[] labels = new String[options.length];
-        for (int i = 0; i < options.length; i++) {
-            labels[i] = options[i].getDisplayName();
+    @Override
+    public void mouseClicked(MouseEvent e) {
+    }
+
+    @Override
+    public void mousePressed(MouseEvent e) {
+        if (!fullscreenActive) {
+            return;
         }
 
-        int selectedIndex = JOptionPane.showOptionDialog(
-            this,
-            "Choose your starting weapon",
-            "Weapon Select",
-            JOptionPane.DEFAULT_OPTION,
-            JOptionPane.PLAIN_MESSAGE,
-            null,
-            labels,
-            labels[0]
+        int mouseX = e.getX();
+        int mouseY = e.getY();
+
+        if (exitConfirmationActive) {
+            if (exitConfirmButtonBounds != null && exitConfirmButtonBounds.contains(mouseX, mouseY)) {
+                closeApplication();
+                return;
+            }
+
+            if (exitCancelButtonBounds != null && exitCancelButtonBounds.contains(mouseX, mouseY)) {
+                hideExitConfirmation();
+            }
+            return;
+        }
+
+        if (weaponSelectionActive) {
+            handleWeaponSelectionClick(mouseX, mouseY);
+            return;
+        }
+
+        if (gamePanel.isLevelUpChoiceActive()) {
+            handleLevelUpClick(mouseX, mouseY);
+            return;
+        }
+
+        if (pauseButtonBounds != null && pauseButtonBounds.contains(mouseX, mouseY)) {
+            togglePause();
+            return;
+        }
+
+        if (exitButtonBounds != null && exitButtonBounds.contains(mouseX, mouseY)) {
+            showExitConfirmation();
+        }
+    }
+
+    @Override
+    public void mouseReleased(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseEntered(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseExited(MouseEvent e) {
+        mouseOverPauseButton = false;
+        mouseOverExitButton = false;
+        mouseOverExitConfirmButton = false;
+        mouseOverExitCancelButton = false;
+        clearChoiceHoverStates();
+    }
+
+    @Override
+    public void mouseDragged(MouseEvent e) {
+        mouseMoved(e);
+    }
+
+    @Override
+    public void mouseMoved(MouseEvent e) {
+        if (!fullscreenActive) {
+            return;
+        }
+
+        int mouseX = e.getX();
+        int mouseY = e.getY();
+        mouseOverPauseButton = pauseButtonBounds != null && pauseButtonBounds.contains(mouseX, mouseY);
+        mouseOverExitButton = exitButtonBounds != null && exitButtonBounds.contains(mouseX, mouseY);
+        mouseOverExitConfirmButton = exitConfirmButtonBounds != null && exitConfirmButtonBounds.contains(mouseX, mouseY);
+        mouseOverExitCancelButton = exitCancelButtonBounds != null && exitCancelButtonBounds.contains(mouseX, mouseY);
+        updateChoiceHoverStates(mouseX, mouseY);
+    }
+
+    private void togglePause() {
+        if (!gamePanel.isGameRunning() || gamePanel.isGameOver()) {
+            return;
+        }
+
+        gamePanel.pauseGame();
+    }
+
+    private void updateOverlayButtonBounds(int screenWidth) {
+        int rightX = screenWidth - BUTTON_MARGIN - BUTTON_WIDTH;
+        pauseButtonBounds = new Rectangle(
+            rightX - BUTTON_WIDTH - BUTTON_GAP,
+            BUTTON_MARGIN,
+            BUTTON_WIDTH,
+            BUTTON_HEIGHT
         );
-
-        if (selectedIndex < 0 || selectedIndex >= options.length) {
-            return null;
-        }
-
-        return options[selectedIndex];
+        exitButtonBounds = new Rectangle(
+            rightX,
+            BUTTON_MARGIN,
+            BUTTON_WIDTH,
+            BUTTON_HEIGHT
+        );
     }
 
-    private void requestGameFocus() {
-        gamePanel.requestFocusInWindow();
-        mainPanel.requestFocusInWindow();
-        requestFocusInWindow();
+    private void drawOverlayButtons(Graphics2D g2) {
+        if (weaponSelectionActive || gamePanel.isLevelUpChoiceActive() || exitConfirmationActive) {
+            return;
+        }
+
+        drawOverlayButton(
+            g2,
+            pauseButtonBounds,
+            gamePanel.isGamePaused() ? "Resume" : "Pause",
+            mouseOverPauseButton
+        );
+        drawOverlayButton(g2, exitButtonBounds, "Exit", mouseOverExitButton);
+    }
+
+    private void drawOverlayButton(Graphics2D g2, Rectangle bounds, String label, boolean hovered) {
+        if (bounds == null) {
+            return;
+        }
+
+        g2.setColor(new Color(0, 0, 0, hovered ? 210 : 170));
+        g2.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 18, 18);
+
+        g2.setColor(hovered ? new Color(255, 220, 120) : Color.WHITE);
+        g2.drawRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 18, 18);
+
+        Font oldFont = g2.getFont();
+        g2.setFont(new Font("Arial", Font.BOLD, 18));
+        int textWidth = g2.getFontMetrics().stringWidth(label);
+        int textX = bounds.x + (bounds.width - textWidth) / 2;
+        int textY = bounds.y + ((bounds.height - g2.getFontMetrics().getHeight()) / 2) + g2.getFontMetrics().getAscent();
+        g2.drawString(label, textX, textY);
+        g2.setFont(oldFont);
+    }
+
+    private void drawHudOverlay(Graphics2D g2) {
+        infoPanel.drawHud(g2, 24, 24);
+    }
+
+    private void updateChoiceBounds(int screenWidth, int screenHeight) {
+        int cardWidth = Math.min(320, screenWidth - 120);
+        int cardHeight = 72;
+        int gap = 18;
+        int totalHeight = (cardHeight * 3) + (gap * 2);
+        int startX = (screenWidth - cardWidth) / 2;
+        int startY = (screenHeight - totalHeight) / 2 + 40;
+
+        for (int i = 0; i < 3; i++) {
+            levelUpOptionBounds[i] = new Rectangle(startX, startY + (i * (cardHeight + gap)), cardWidth, cardHeight);
+        }
+
+        int weaponWidth = Math.min(360, screenWidth - 120);
+        int weaponHeight = 62;
+        int weaponGap = 14;
+        int weaponTotalHeight = (weaponHeight * weaponOptions.length) + (weaponGap * (weaponOptions.length - 1));
+        int weaponStartX = (screenWidth - weaponWidth) / 2;
+        int weaponStartY = (screenHeight - weaponTotalHeight) / 2 + 20;
+
+        for (int i = 0; i < weaponOptions.length; i++) {
+            weaponOptionBounds[i] = new Rectangle(
+                weaponStartX,
+                weaponStartY + (i * (weaponHeight + weaponGap)),
+                weaponWidth,
+                weaponHeight
+            );
+        }
+    }
+
+    private void drawWeaponSelectionOverlay(Graphics2D g2, int screenWidth, int screenHeight) {
+        if (!weaponSelectionActive) {
+            return;
+        }
+
+        drawModalBackdrop(g2, screenWidth, screenHeight);
+        drawCenteredTitle(g2, "Choose Your Starting Weapon", screenWidth, screenHeight / 2 - 180, 34);
+
+        Font oldFont = g2.getFont();
+        g2.setFont(new Font("Arial", Font.BOLD, 22));
+        for (int i = 0; i < weaponOptions.length; i++) {
+            drawChoiceButton(g2, weaponOptionBounds[i], weaponOptions[i].getDisplayName(), weaponOptionHovered[i]);
+        }
+        g2.setFont(oldFont);
+    }
+
+    private void drawLevelUpOverlay(Graphics2D g2, int screenWidth, int screenHeight) {
+        if (!gamePanel.isLevelUpChoiceActive()) {
+            return;
+        }
+
+        drawModalBackdrop(g2, screenWidth, screenHeight);
+        drawCenteredTitle(g2, "Level Up", screenWidth, screenHeight / 2 - 170, 38);
+        drawCenteredSubtitle(g2, gamePanel.getLevelUpPromptMessage(), screenWidth, screenHeight / 2 - 130);
+
+        List<PlayerUpgradeOption> choices = gamePanel.getLevelUpChoices();
+        for (int i = 0; i < choices.size() && i < levelUpOptionBounds.length; i++) {
+            drawChoiceButton(
+                g2,
+                levelUpOptionBounds[i],
+                choices.get(i).getDisplayName(gamePanel.getPlayerData()),
+                levelUpOptionHovered[i]
+            );
+        }
+    }
+
+    private void drawExitConfirmationOverlay(Graphics2D g2, int screenWidth, int screenHeight) {
+        if (!exitConfirmationActive) {
+            return;
+        }
+
+        drawModalBackdrop(g2, screenWidth, screenHeight);
+
+        int dialogWidth = Math.min(460, screenWidth - 80);
+        int dialogHeight = 220;
+        int dialogX = (screenWidth - dialogWidth) / 2;
+        int dialogY = (screenHeight - dialogHeight) / 2;
+
+        g2.setColor(new Color(18, 18, 18, 240));
+        g2.fillRoundRect(dialogX, dialogY, dialogWidth, dialogHeight, 28, 28);
+        g2.setColor(Color.WHITE);
+        g2.drawRoundRect(dialogX, dialogY, dialogWidth, dialogHeight, 28, 28);
+
+        drawCenteredTitle(g2, "Exit Game?", screenWidth, dialogY + 62, 32);
+        drawCenteredSubtitle(g2, "Are you sure you want to leave the game?", screenWidth, dialogY + 102);
+
+        int buttonWidth = 150;
+        int buttonHeight = 48;
+        int buttonGap = 20;
+        int totalButtonWidth = (buttonWidth * 2) + buttonGap;
+        int buttonStartX = (screenWidth - totalButtonWidth) / 2;
+        int buttonY = dialogY + 140;
+
+        exitConfirmButtonBounds = new Rectangle(buttonStartX, buttonY, buttonWidth, buttonHeight);
+        exitCancelButtonBounds = new Rectangle(buttonStartX + buttonWidth + buttonGap, buttonY, buttonWidth, buttonHeight);
+
+        drawChoiceButton(g2, exitConfirmButtonBounds, "Yes, Exit", mouseOverExitConfirmButton);
+        drawChoiceButton(g2, exitCancelButtonBounds, "No, Stay", mouseOverExitCancelButton);
+    }
+
+    private void drawModalBackdrop(Graphics2D g2, int screenWidth, int screenHeight) {
+        g2.setColor(new Color(0, 0, 0, 190));
+        g2.fillRect(0, 0, screenWidth, screenHeight);
+    }
+
+    private void drawCenteredTitle(Graphics2D g2, String text, int screenWidth, int y, int fontSize) {
+        Font oldFont = g2.getFont();
+        g2.setFont(new Font("Arial", Font.BOLD, fontSize));
+        g2.setColor(Color.WHITE);
+        int textWidth = g2.getFontMetrics().stringWidth(text);
+        g2.drawString(text, (screenWidth - textWidth) / 2, y);
+        g2.setFont(oldFont);
+    }
+
+    private void drawCenteredSubtitle(Graphics2D g2, String text, int screenWidth, int y) {
+        Font oldFont = g2.getFont();
+        g2.setFont(new Font("Arial", Font.PLAIN, 18));
+        g2.setColor(Color.LIGHT_GRAY);
+        int textWidth = g2.getFontMetrics().stringWidth(text);
+        g2.drawString(text, (screenWidth - textWidth) / 2, y);
+        g2.setFont(oldFont);
+    }
+
+    private void drawChoiceButton(Graphics2D g2, Rectangle bounds, String label, boolean hovered) {
+        if (bounds == null) {
+            return;
+        }
+
+        g2.setColor(new Color(18, 18, 18, hovered ? 245 : 220));
+        g2.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 22, 22);
+        g2.setColor(hovered ? new Color(255, 220, 120) : Color.WHITE);
+        g2.drawRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 22, 22);
+
+        Font oldFont = g2.getFont();
+        g2.setFont(new Font("Arial", Font.BOLD, 22));
+        int textWidth = g2.getFontMetrics().stringWidth(label);
+        int textX = bounds.x + (bounds.width - textWidth) / 2;
+        int textY = bounds.y + ((bounds.height - g2.getFontMetrics().getHeight()) / 2) + g2.getFontMetrics().getAscent();
+        g2.drawString(label, textX, textY);
+        g2.setFont(oldFont);
+    }
+
+    private void handleWeaponSelectionClick(int mouseX, int mouseY) {
+        for (int i = 0; i < weaponOptionBounds.length; i++) {
+            if (weaponOptionBounds[i] != null && weaponOptionBounds[i].contains(mouseX, mouseY)) {
+                weaponSelectionActive = false;
+                clearChoiceHoverStates();
+                gamePanel.setSelectedWeapon(weaponOptions[i]);
+                gamePanel.startGame();
+                return;
+            }
+        }
+    }
+
+    private void handleLevelUpClick(int mouseX, int mouseY) {
+        List<PlayerUpgradeOption> choices = gamePanel.getLevelUpChoices();
+        for (int i = 0; i < choices.size() && i < levelUpOptionBounds.length; i++) {
+            if (levelUpOptionBounds[i] != null && levelUpOptionBounds[i].contains(mouseX, mouseY)) {
+                clearChoiceHoverStates();
+                gamePanel.applyLevelUpChoice(i);
+                return;
+            }
+        }
+    }
+
+    private void updateChoiceHoverStates(int mouseX, int mouseY) {
+        if (exitConfirmationActive) {
+            for (int i = 0; i < weaponOptionHovered.length; i++) {
+                weaponOptionHovered[i] = false;
+            }
+            for (int i = 0; i < levelUpOptionHovered.length; i++) {
+                levelUpOptionHovered[i] = false;
+            }
+            return;
+        }
+
+        if (weaponSelectionActive) {
+            for (int i = 0; i < weaponOptionBounds.length; i++) {
+                weaponOptionHovered[i] = weaponOptionBounds[i] != null && weaponOptionBounds[i].contains(mouseX, mouseY);
+            }
+        } else {
+            for (int i = 0; i < weaponOptionHovered.length; i++) {
+                weaponOptionHovered[i] = false;
+            }
+        }
+
+        if (gamePanel.isLevelUpChoiceActive()) {
+            List<PlayerUpgradeOption> choices = gamePanel.getLevelUpChoices();
+            for (int i = 0; i < levelUpOptionBounds.length; i++) {
+                levelUpOptionHovered[i] = i < choices.size()
+                    && levelUpOptionBounds[i] != null
+                    && levelUpOptionBounds[i].contains(mouseX, mouseY);
+            }
+        } else {
+            for (int i = 0; i < levelUpOptionHovered.length; i++) {
+                levelUpOptionHovered[i] = false;
+            }
+        }
+    }
+
+    private void clearChoiceHoverStates() {
+        for (int i = 0; i < weaponOptionHovered.length; i++) {
+            weaponOptionHovered[i] = false;
+        }
+
+        for (int i = 0; i < levelUpOptionHovered.length; i++) {
+            levelUpOptionHovered[i] = false;
+        }
+    }
+
+    private void showExitConfirmation() {
+        exitConfirmationActive = true;
+        mouseOverExitConfirmButton = false;
+        mouseOverExitCancelButton = false;
+        clearChoiceHoverStates();
+
+        if (gamePanel.isGameRunning() && !gamePanel.isGamePaused() && !gamePanel.isGameOver()) {
+            gamePanel.pauseGame();
+            exitConfirmationPausedGame = true;
+        } else {
+            exitConfirmationPausedGame = false;
+        }
+    }
+
+    private void hideExitConfirmation() {
+        exitConfirmationActive = false;
+        exitConfirmButtonBounds = null;
+        exitCancelButtonBounds = null;
+        mouseOverExitConfirmButton = false;
+        mouseOverExitCancelButton = false;
+
+        if (exitConfirmationPausedGame) {
+            gamePanel.pauseGame();
+            exitConfirmationPausedGame = false;
+        }
+    }
+
+    private void closeApplication() {
+        exitConfirmationActive = false;
+        exitConfirmationPausedGame = false;
+        gamePanel.setRenderCallback(null);
+        gamePanel.stopGame();
+
+        Window fullscreenWindow = device.getFullScreenWindow();
+        if (fullscreenWindow == this) {
+            device.setFullScreenWindow(null);
+        }
+
+        dispose();
+        System.exit(0);
     }
 }

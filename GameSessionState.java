@@ -2,7 +2,6 @@ public class GameSessionState {
     private boolean gameRunning;
     private boolean gamePaused;
     private boolean gameOver;
-    private String activeEffectName;
     private int collectedCount;
     private int totalCollectibles;
     private int fps;
@@ -19,7 +18,6 @@ public class GameSessionState {
         gameRunning = false;
         gamePaused = false;
         gameOver = false;
-        activeEffectName = "None";
         collectedCount = 0;
         totalCollectibles = 0;
         fps = 0;
@@ -33,7 +31,6 @@ public class GameSessionState {
         gameRunning = true;
         gamePaused = false;
         gameOver = false;
-        activeEffectName = "None";
         collectedCount = 0;
         goldenTintActive = false;
         goldenTintTimer = 0;
@@ -63,14 +60,6 @@ public class GameSessionState {
 
     public void setGameOver(boolean gameOver) {
         this.gameOver = gameOver;
-    }
-
-    public String getActiveEffectName() {
-        return activeEffectName;
-    }
-
-    public void setActiveEffectName(String activeEffectName) {
-        this.activeEffectName = activeEffectName;
     }
 
     public int getCollectedCount() {

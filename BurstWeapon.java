@@ -52,6 +52,13 @@ public abstract class BurstWeapon extends Weapon {
         return Math.max(80L, (long) Math.round(baseFireIntervalMs / playerData.getFireRateMultiplier()));
     }
 
+    @Override
+    public void appendHudStats(java.util.List<String> lines, Player playerData) {
+        super.appendHudStats(lines, playerData);
+        lines.add("Fire Rate: " + formatMultiplier(playerData.getFireRateMultiplier()));
+        lines.add("Projectile Count: " + getProjectileCount(playerData));
+    }
+
     protected void fireProjectile(GameWorld world, PlayerSprite player, Player playerData, Enemy targetEnemy) {
         Projectile projectile = createProjectile(
             player.getCenterX(),

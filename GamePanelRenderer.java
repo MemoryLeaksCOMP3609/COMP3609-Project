@@ -29,7 +29,7 @@ public class GamePanelRenderer {
         }
 
         if (!sessionState.isGameRunning() && !sessionState.isGameOver()) {
-            drawStartScreen(g2);
+            drawStartScreen(g2, panelWidth, panelHeight);
             return;
         }
 
@@ -58,12 +58,18 @@ public class GamePanelRenderer {
         }
     }
 
-    private void drawStartScreen(Graphics2D g2) {
+    private void drawStartScreen(Graphics2D g2, int panelWidth, int panelHeight) {
         g2.setColor(Color.WHITE);
         g2.setFont(new Font("Arial", Font.BOLD, 36));
-        g2.drawString("Coin Collector", 275, 280);
+        String title = "Coin Collector";
+        int titleX = (panelWidth - g2.getFontMetrics().stringWidth(title)) / 2;
+        int titleY = panelHeight / 2 - 20;
+        g2.drawString(title, titleX, titleY);
         g2.setFont(new Font("Arial", Font.PLAIN, 18));
-        g2.drawString("Press Start to begin", 320, 330);
+        String subtitle = "Press Start to begin";
+        int subtitleX = (panelWidth - g2.getFontMetrics().stringWidth(subtitle)) / 2;
+        int subtitleY = titleY + 50;
+        g2.drawString(subtitle, subtitleX, subtitleY);
     }
 
     private void drawWorld(Graphics2D g2, int panelWidth, int panelHeight, GameWorld world) {
@@ -139,7 +145,10 @@ public class GamePanelRenderer {
 
         g2.setColor(Color.WHITE);
         g2.setFont(new Font("Arial", Font.BOLD, 48));
-        g2.drawString("Game Over", 270, 280);
+        String message = "Game Over";
+        int textX = (panelWidth - g2.getFontMetrics().stringWidth(message)) / 2;
+        int textY = panelHeight / 2;
+        g2.drawString(message, textX, textY);
     }
 
     private boolean isVisibleOnScreen(Rectangle2D.Double worldBounds, int panelWidth, int panelHeight, GameWorld world) {

@@ -107,7 +107,6 @@ public class GameLoopMetrics {
         if (infoPanel != null && now - lastHudUpdateNanos >= HUD_UPDATE_INTERVAL_NANOS) {
             infoPanel.updatePlayerStats(playerData);
             infoPanel.updateFPS(sessionState.getFps());
-            infoPanel.updateActiveEffects(sessionState.getActiveEffectName());
             lastHudUpdateNanos = now;
         }
     }
