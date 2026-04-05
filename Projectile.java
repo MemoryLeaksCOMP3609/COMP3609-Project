@@ -272,7 +272,7 @@ public abstract class Projectile {
         double nearestDistance = Double.MAX_VALUE;
 
         for (Enemy enemy : world.getEnemies()) {
-            if (enemy.isDead()) {
+            if (!enemy.isTargetable()) {
                 continue;
             }
 

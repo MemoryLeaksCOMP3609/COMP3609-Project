@@ -1,3 +1,4 @@
+import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.geom.AffineTransform;
@@ -180,7 +181,7 @@ public abstract class Enemy extends Sprite {
     }
 
     public void takeDamage(int damage) {
-        if (damage <= 0 || isDead()) {
+        if (damage <= 0 || !canTakeDamage()) {
             return;
         }
 
@@ -200,25 +201,19 @@ public abstract class Enemy extends Sprite {
         return state == EnemyState.DEAD || currentHealth <= 0;
     }
 
+    public boolean isTargetable() {
+        return !isDead();
+    }
+
+    public boolean canTakeDamage() {
+        return !isDead();
+    }
+
     @Override
     public void draw(Graphics2D g2) {
-        BufferedImage currentFrame = getCurrentBufferedImage();
-        if (currentFrame != null) {
-            BufferedImage frameToDraw = currentFrame;
-            if (damageFlashRemainingMs > 0) {
-                frameToDraw = getDamageFlashFrame(currentFrame);
-            }
-            if (facingLeft == spriteFacesLeftByDefault) {
-                g2.drawImage(frameToDraw, screenX, screenY, width, height, null);
-            } else {
-                AffineTransform originalTransform = g2.getTransform();
-                AffineTransform flippedTransform = new AffineTransform();
-                flippedTransform.translate(screenX + width, screenY);
-                flippedTransform.scale(-1, 1);
-                g2.transform(flippedTransform);
-                g2.drawImage(frameToDraw, 0, 0, width, height, null);
-                g2.setTransform(originalTransform);
-            }
+        BufferedImage frameToDraw = getFrameToDraw();
+        if (frameToDraw != null) {
+            drawFrame(g2, frameToDraw, 1.0f);
         }
     }
 
@@ -326,5 +321,44 @@ public abstract class Enemy extends Sprite {
         }
 
         return cachedDamageFlashFrame;
+    }
+
+    protected BufferedImage getFrameToDraw() {
+        BufferedImage currentFrame = getCurrentBufferedImage();
+        if (currentFrame == null) {
+            return null;
+        }
+
+        if (damageFlashRemainingMs > 0) {
+            return getDamageFlashFrame(currentFrame);
+        }
+
+        return currentFrame;
+    }
+
+    protected void drawFrame(Graphics2D g2, BufferedImage frameToDraw, float alpha) {
+        if (frameToDraw == null || alpha <= 0.0f) {
+            return;
+        }
+
+        AffineTransform originalTransform = g2.getTransform();
+        java.awt.Composite originalComposite = g2.getComposite();
+
+        if (alpha < 1.0f) {
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+        }
+
+        if (facingLeft == spriteFacesLeftByDefault) {
+            g2.drawImage(frameToDraw, screenX, screenY, width, height, null);
+        } else {
+            AffineTransform flippedTransform = new AffineTransform();
+            flippedTransform.translate(screenX + width, screenY);
+            flippedTransform.scale(-1, 1);
+            g2.transform(flippedTransform);
+            g2.drawImage(frameToDraw, 0, 0, width, height, null);
+        }
+
+        g2.setTransform(originalTransform);
+        g2.setComposite(originalComposite);
     }
 }

@@ -4,6 +4,7 @@ import java.util.function.IntConsumer;
 
 public class GameCombatSystem {
     private static final int HEALTH_PER_CRYSTAL = 20;
+    private static final long GHOST_CONTACT_COOLDOWN_MS = 500L;
 
     private final GameWorld world;
     private final GameSessionState sessionState;
@@ -51,6 +52,8 @@ public class GameCombatSystem {
                 updateBatEnemy(enemy, player, deltaTimeMs, distanceToPlayer);
             } else if (enemy instanceof SkeletonEnemy) {
                 ((SkeletonEnemy) enemy).updateBehavior(player, deltaTimeMs);
+            } else if (enemy instanceof GhostEnemy) {
+                ((GhostEnemy) enemy).updateBehavior(player, deltaTimeMs, world.getWorldWidth(), world.getWorldHeight());
             } else {
                 enemy.moveToward(player.getCenterX(), player.getCenterY(), deltaTimeMs);
             }
@@ -96,6 +99,7 @@ public class GameCombatSystem {
         handleCollectibleCollisions(player, playerData, playerBounds, queueLevelUpChoices);
         handleCrystalCollisions(playerData, playerBounds, queueLevelUpChoices);
         handleSkeletonDashCollisions(player, playerData, playerBounds, onPlayerDeath);
+        handleGhostContactCollisions(player, playerData, playerBounds, onPlayerDeath);
         handleProjectileCollisions(player, playerData, onPlayerDeath);
     }
 
@@ -154,7 +158,7 @@ public class GameCombatSystem {
                 if (projectile.hasImpacted() || !projectile.canDamage()) {
                     break;
                 }
-                if (!enemy.isDead() && projectile.intersects(enemy.getBoundingRectangle())) {
+                if (enemy.canTakeDamage() && projectile.intersects(enemy.getBoundingRectangle())) {
                     enemy.takeDamage(projectile.getDamage());
                     if (enemy.isDead()) {
                         world.spawnCrystalDrop(enemy);
@@ -187,6 +191,29 @@ public class GameCombatSystem {
                 playerData.takeDamage(skeleton.getContactDamage());
                 player.triggerDamageFlash();
                 skeleton.markDashHitApplied();
+                if (playerData.getHealth() <= 0) {
+                    onPlayerDeath.run();
+                }
+            }
+        }
+    }
+
+    private void handleGhostContactCollisions(PlayerSprite player, Player playerData,
+                                              Rectangle2D.Double playerBounds, Runnable onPlayerDeath) {
+        if (playerData == null) {
+            return;
+        }
+
+        for (Enemy enemy : world.getEnemies()) {
+            if (!(enemy instanceof GhostEnemy) || !enemy.canAttack() || !enemy.isTargetable()) {
+                continue;
+            }
+
+            if (PixelCollision.intersects(playerBounds, player.getCurrentBufferedImage(),
+                enemy.getBoundingRectangle(), enemy.getCurrentBufferedImage())) {
+                playerData.takeDamage(enemy.getContactDamage());
+                player.triggerDamageFlash();
+                enemy.setAttackCooldown(GHOST_CONTACT_COOLDOWN_MS);
                 if (playerData.getHealth() <= 0) {
                     onPlayerDeath.run();
                 }
