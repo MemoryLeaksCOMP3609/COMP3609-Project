@@ -29,6 +29,10 @@ public class PlayerSprite extends Sprite {
     private long damageFlashRemainingMs;
     private BufferedImage cachedBaseFrame;
     private BufferedImage cachedDamageFlashFrame;
+    private BufferedImage cachedCollisionMaskBaseFrame;
+    private BufferedImage cachedCollisionMaskFrame;
+    private static final double COLLISION_MASK_HEAD_TRIM_RATIO = 0.22;
+    private static final double COLLISION_MASK_LEG_TRIM_RATIO = 0.30;
     
     // Animation states
     public static final int STATE_IDLE = 0;
@@ -102,6 +106,8 @@ public class PlayerSprite extends Sprite {
         damageFlashRemainingMs = 0;
         cachedBaseFrame = null;
         cachedDamageFlashFrame = null;
+        cachedCollisionMaskBaseFrame = null;
+        cachedCollisionMaskFrame = null;
         width = 50;
         height = 50;
         
@@ -302,6 +308,20 @@ public class PlayerSprite extends Sprite {
 
         return PixelCollision.toBufferedImage(image);
     }
+
+    public BufferedImage getCurrentCollisionMaskImage() {
+        BufferedImage currentFrame = getCurrentBufferedImage();
+        if (currentFrame == null) {
+            return null;
+        }
+
+        if (currentFrame != cachedCollisionMaskBaseFrame || cachedCollisionMaskFrame == null) {
+            cachedCollisionMaskBaseFrame = currentFrame;
+            cachedCollisionMaskFrame = createCollisionMask(currentFrame);
+        }
+
+        return cachedCollisionMaskFrame;
+    }
     
     public int getWorldX() {
         return worldX;
@@ -411,5 +431,24 @@ public class PlayerSprite extends Sprite {
         }
 
         return cachedDamageFlashFrame;
+    }
+
+    private BufferedImage createCollisionMask(BufferedImage sourceFrame) {
+        int frameWidth = sourceFrame.getWidth();
+        int frameHeight = sourceFrame.getHeight();
+        BufferedImage collisionMask = new BufferedImage(frameWidth, frameHeight, BufferedImage.TYPE_INT_ARGB);
+
+        int topTrim = (int) Math.round(frameHeight * COLLISION_MASK_HEAD_TRIM_RATIO);
+        int bottomTrim = (int) Math.round(frameHeight * COLLISION_MASK_LEG_TRIM_RATIO);
+        int startY = Math.max(0, Math.min(frameHeight, topTrim));
+        int endY = Math.max(startY, Math.min(frameHeight, frameHeight - bottomTrim));
+
+        for (int y = startY; y < endY; y++) {
+            for (int x = 0; x < frameWidth; x++) {
+                collisionMask.setRGB(x, y, sourceFrame.getRGB(x, y));
+            }
+        }
+
+        return collisionMask;
     }
 }

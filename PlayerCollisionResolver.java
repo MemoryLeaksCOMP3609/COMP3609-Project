@@ -12,7 +12,7 @@ public class PlayerCollisionResolver {
     public boolean resolve(PlayerSprite player, ArrayList<SolidObject> solidObjects,
                            int fallbackX, int fallbackY, int moveDirection) {
         Rectangle2D.Double playerBounds = player.getBoundingRectangle();
-        BufferedImage playerImage = player.getCurrentBufferedImage();
+        BufferedImage playerImage = player.getCurrentCollisionMaskImage();
 
         for (SolidObject solid : solidObjects) {
             if (PixelCollision.intersects(playerBounds, playerImage,
@@ -47,7 +47,7 @@ public class PlayerCollisionResolver {
     }
 
     private boolean isPlayerCollidingWithSolid(PlayerSprite player, SolidObject solid) {
-        return PixelCollision.intersects(player.getBoundingRectangle(), player.getCurrentBufferedImage(),
+        return PixelCollision.intersects(player.getBoundingRectangle(), player.getCurrentCollisionMaskImage(),
             solid.getBoundingRectangle(), solid.getImage());
     }
 

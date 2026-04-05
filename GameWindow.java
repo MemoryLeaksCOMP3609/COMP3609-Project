@@ -7,6 +7,7 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
+import java.awt.FontMetrics;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.Window;
@@ -19,6 +20,7 @@ import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 import java.awt.image.BufferStrategy;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
 import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -35,6 +37,9 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
     private static final int BUTTON_HEIGHT = 42;
     private static final int BUTTON_GAP = 12;
     private static final int BUTTON_MARGIN = 24;
+    private static final int TEST_BUTTON_HEIGHT = 34;
+    private static final int TEST_BUTTON_GAP = 8;
+    private static final int TEST_BUTTON_PADDING = 16;
 
     private final JPanel launcherPanel;
     private final JButton launcherStartButton;
@@ -62,6 +67,14 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
     private final WeaponType[] weaponOptions;
     private boolean[] weaponOptionHovered;
     private boolean[] levelUpOptionHovered;
+    private final TestEnemySpawnType[] testEnemyButtons;
+    private final TestBossSpawnType[] testBossButtons;
+    private Rectangle[] testEnemyButtonBounds;
+    private Rectangle[] testBossButtonBounds;
+    private boolean[] testEnemyButtonHovered;
+    private boolean[] testBossButtonHovered;
+    private TestEnemySpawnType selectedTestEnemyButton;
+    private TestBossSpawnType selectedTestBossButton;
 
     public GameWindow() {
         super("Coin Collector");
@@ -78,6 +91,14 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         weaponOptionHovered = new boolean[weaponOptions.length];
         levelUpOptionBounds = new Rectangle[3];
         levelUpOptionHovered = new boolean[3];
+        testEnemyButtons = TestEnemySpawnType.values();
+        testBossButtons = TestBossSpawnType.values();
+        testEnemyButtonBounds = new Rectangle[testEnemyButtons.length];
+        testBossButtonBounds = new Rectangle[testBossButtons.length];
+        testEnemyButtonHovered = new boolean[testEnemyButtons.length];
+        testBossButtonHovered = new boolean[testBossButtons.length];
+        selectedTestEnemyButton = TestEnemySpawnType.BAT;
+        selectedTestBossButton = null;
 
         launcherPanel = new JPanel();
         launcherPanel.setLayout(new BoxLayout(launcherPanel, BoxLayout.Y_AXIS));
@@ -173,6 +194,7 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         gamePanel.setViewportSize(width, height);
         screenImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         updateOverlayButtonBounds(width);
+        updateTestButtonBounds(width);
 
         try {
             createBufferStrategy(NUM_BUFFERS);
@@ -197,6 +219,7 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
 
         gamePanel.setViewportSize(width, height);
         updateOverlayButtonBounds(width);
+        updateTestButtonBounds(width);
         updateChoiceBounds(width, height);
 
         do {
@@ -338,6 +361,24 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
             return;
         }
 
+        for (int i = 0; i < testEnemyButtonBounds.length; i++) {
+            if (testEnemyButtonBounds[i] != null && testEnemyButtonBounds[i].contains(mouseX, mouseY)) {
+                selectedTestEnemyButton = testEnemyButtons[i];
+                selectedTestBossButton = null;
+                gamePanel.activateTestEnemySpawn(testEnemyButtons[i]);
+                return;
+            }
+        }
+
+        for (int i = 0; i < testBossButtonBounds.length; i++) {
+            if (testBossButtonBounds[i] != null && testBossButtonBounds[i].contains(mouseX, mouseY)) {
+                selectedTestBossButton = testBossButtons[i];
+                selectedTestEnemyButton = null;
+                gamePanel.spawnTestBoss(testBossButtons[i]);
+                return;
+            }
+        }
+
         if (exitButtonBounds != null && exitButtonBounds.contains(mouseX, mouseY)) {
             showExitConfirmation();
         }
@@ -357,6 +398,12 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         mouseOverExitButton = false;
         mouseOverExitConfirmButton = false;
         mouseOverExitCancelButton = false;
+        for (int i = 0; i < testEnemyButtonHovered.length; i++) {
+            testEnemyButtonHovered[i] = false;
+        }
+        for (int i = 0; i < testBossButtonHovered.length; i++) {
+            testBossButtonHovered[i] = false;
+        }
         clearChoiceHoverStates();
     }
 
@@ -377,6 +424,13 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         mouseOverExitButton = exitButtonBounds != null && exitButtonBounds.contains(mouseX, mouseY);
         mouseOverExitConfirmButton = exitConfirmButtonBounds != null && exitConfirmButtonBounds.contains(mouseX, mouseY);
         mouseOverExitCancelButton = exitCancelButtonBounds != null && exitCancelButtonBounds.contains(mouseX, mouseY);
+        for (int i = 0; i < testEnemyButtonBounds.length; i++) {
+            testEnemyButtonHovered[i] = testEnemyButtonBounds[i] != null && testEnemyButtonBounds[i].contains(mouseX, mouseY);
+        }
+        for (int i = 0; i < testBossButtonBounds.length; i++) {
+            testBossButtonHovered[i] = testBossButtonBounds[i] != null
+                && testBossButtonBounds[i].contains(mouseX, mouseY);
+        }
         updateChoiceHoverStates(mouseX, mouseY);
     }
 
@@ -404,10 +458,42 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         );
     }
 
+    private void updateTestButtonBounds(int screenWidth) {
+        FontMetrics metrics = getFontMetrics(new Font("Arial", Font.BOLD, 14));
+        int totalWidth = 0;
+        for (int i = 0; i < testEnemyButtons.length; i++) {
+            totalWidth += metrics.stringWidth(testEnemyButtons[i].getDisplayName()) + (TEST_BUTTON_PADDING * 2);
+        }
+        totalWidth += TEST_BUTTON_GAP * Math.max(0, testEnemyButtons.length - 1);
+        totalWidth += 20;
+        for (int i = 0; i < testBossButtons.length; i++) {
+            totalWidth += metrics.stringWidth(testBossButtons[i].getDisplayName()) + (TEST_BUTTON_PADDING * 2);
+        }
+        totalWidth += TEST_BUTTON_GAP * Math.max(0, testBossButtons.length - 1);
+
+        int x = Math.max(BUTTON_MARGIN, (screenWidth - totalWidth) / 2);
+        int y = BUTTON_MARGIN;
+
+        for (int i = 0; i < testEnemyButtons.length; i++) {
+            int buttonWidth = metrics.stringWidth(testEnemyButtons[i].getDisplayName()) + (TEST_BUTTON_PADDING * 2);
+            testEnemyButtonBounds[i] = new Rectangle(x, y, buttonWidth, TEST_BUTTON_HEIGHT);
+            x += buttonWidth + TEST_BUTTON_GAP;
+        }
+
+        x += 20;
+        for (int i = 0; i < testBossButtons.length; i++) {
+            int buttonWidth = metrics.stringWidth(testBossButtons[i].getDisplayName()) + (TEST_BUTTON_PADDING * 2);
+            testBossButtonBounds[i] = new Rectangle(x, y, buttonWidth, TEST_BUTTON_HEIGHT);
+            x += buttonWidth + TEST_BUTTON_GAP;
+        }
+    }
+
     private void drawOverlayButtons(Graphics2D g2) {
         if (weaponSelectionActive || gamePanel.isLevelUpChoiceActive() || exitConfirmationActive) {
             return;
         }
+
+        drawTestButtons(g2);
 
         drawOverlayButton(
             g2,
@@ -438,13 +524,71 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         g2.setFont(oldFont);
     }
 
+    private void drawTestButtons(Graphics2D g2) {
+        for (int i = 0; i < testEnemyButtons.length; i++) {
+            drawTestButton(
+                g2,
+                testEnemyButtonBounds[i],
+                testEnemyButtons[i].getDisplayName(),
+                testEnemyButtonHovered[i],
+                testEnemyButtons[i] == selectedTestEnemyButton,
+                false
+            );
+        }
+
+        for (int i = 0; i < testBossButtons.length; i++) {
+            drawTestButton(
+                g2,
+                testBossButtonBounds[i],
+                testBossButtons[i].getDisplayName(),
+                testBossButtonHovered[i],
+                testBossButtons[i] == selectedTestBossButton,
+                false
+            );
+        }
+    }
+
+    private void drawTestButton(Graphics2D g2, Rectangle bounds, String label, boolean hovered,
+                                boolean active, boolean disabled) {
+        if (bounds == null) {
+            return;
+        }
+
+        Color fillColor = disabled
+            ? new Color(45, 45, 45, 180)
+            : active
+                ? new Color(110, 30, 30, 220)
+                : new Color(0, 0, 0, hovered ? 210 : 170);
+        Color borderColor = disabled
+            ? new Color(140, 140, 140)
+            : active
+                ? new Color(255, 220, 120)
+                : hovered ? new Color(255, 220, 120) : Color.WHITE;
+        Color textColor = disabled ? new Color(170, 170, 170) : borderColor;
+
+        g2.setColor(fillColor);
+        g2.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 16, 16);
+        g2.setColor(borderColor);
+        g2.drawRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 16, 16);
+
+        Font oldFont = g2.getFont();
+        g2.setFont(new Font("Arial", Font.BOLD, 14));
+        FontMetrics metrics = g2.getFontMetrics();
+        int textWidth = metrics.stringWidth(label);
+        int textX = bounds.x + (bounds.width - textWidth) / 2;
+        int textY = bounds.y + ((bounds.height - metrics.getHeight()) / 2) + metrics.getAscent();
+        g2.setColor(textColor);
+        g2.drawString(label, textX, textY);
+        g2.setFont(oldFont);
+    }
+
     private void drawHudOverlay(Graphics2D g2) {
         infoPanel.drawHud(g2, 24, 24);
     }
 
     private void updateChoiceBounds(int screenWidth, int screenHeight) {
-        int cardWidth = Math.min(320, screenWidth - 120);
-        int cardHeight = 72;
+        int cardWidth = Math.min(420, screenWidth - 120);
+        int cardHeight = 80;
         int gap = 18;
         int totalHeight = (cardHeight * 3) + (gap * 2);
         int startX = (screenWidth - cardWidth) / 2;
@@ -454,8 +598,8 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
             levelUpOptionBounds[i] = new Rectangle(startX, startY + (i * (cardHeight + gap)), cardWidth, cardHeight);
         }
 
-        int weaponWidth = Math.min(360, screenWidth - 120);
-        int weaponHeight = 62;
+        int weaponWidth = Math.min(500, screenWidth - 120);
+        int weaponHeight = 118;
         int weaponGap = 14;
         int weaponTotalHeight = (weaponHeight * weaponOptions.length) + (weaponGap * (weaponOptions.length - 1));
         int weaponStartX = (screenWidth - weaponWidth) / 2;
@@ -480,9 +624,8 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         drawCenteredTitle(g2, "Choose Your Starting Weapon", screenWidth, screenHeight / 2 - 180, 34);
 
         Font oldFont = g2.getFont();
-        g2.setFont(new Font("Arial", Font.BOLD, 22));
         for (int i = 0; i < weaponOptions.length; i++) {
-            drawChoiceButton(g2, weaponOptionBounds[i], weaponOptions[i].getDisplayName(), weaponOptionHovered[i]);
+            drawWeaponChoiceButton(g2, weaponOptionBounds[i], weaponOptions[i], weaponOptionHovered[i]);
         }
         g2.setFont(oldFont);
     }
@@ -498,10 +641,11 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
 
         List<PlayerUpgradeOption> choices = gamePanel.getLevelUpChoices();
         for (int i = 0; i < choices.size() && i < levelUpOptionBounds.length; i++) {
-            drawChoiceButton(
+            drawLevelUpChoiceButton(
                 g2,
                 levelUpOptionBounds[i],
-                choices.get(i).getDisplayName(gamePanel.getPlayerData()),
+                choices.get(i),
+                gamePanel.getPlayerData(),
                 levelUpOptionHovered[i]
             );
         }
@@ -581,6 +725,122 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         int textY = bounds.y + ((bounds.height - g2.getFontMetrics().getHeight()) / 2) + g2.getFontMetrics().getAscent();
         g2.drawString(label, textX, textY);
         g2.setFont(oldFont);
+    }
+
+    private void drawWeaponChoiceButton(Graphics2D g2, Rectangle bounds, WeaponType weaponType, boolean hovered) {
+        if (bounds == null || weaponType == null) {
+            return;
+        }
+
+        g2.setColor(new Color(18, 18, 18, hovered ? 245 : 220));
+        g2.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 22, 22);
+        g2.setColor(hovered ? new Color(255, 220, 120) : Color.WHITE);
+        g2.drawRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 22, 22);
+
+        int padding = 14;
+        int iconSize = bounds.height - (padding * 2);
+        int contentX = bounds.x + padding;
+        int contentY = bounds.y + padding;
+
+        BufferedImage icon = weaponType.getIconImage();
+        if (icon != null) {
+            BufferedImage scaledIcon = ImageManager.scaleImageToHeight(icon, iconSize);
+            if (scaledIcon != null) {
+                int iconY = bounds.y + (bounds.height - scaledIcon.getHeight()) / 2;
+                g2.drawImage(scaledIcon, contentX, iconY, null);
+                contentX += scaledIcon.getWidth() + 14;
+            }
+        }
+
+        Font oldFont = g2.getFont();
+        g2.setColor(hovered ? new Color(255, 220, 120) : Color.WHITE);
+
+        g2.setFont(new Font("Arial", Font.BOLD, 22));
+        int titleY = contentY + g2.getFontMetrics().getAscent();
+        g2.drawString(weaponType.getDisplayName(), contentX, titleY);
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 14));
+        g2.setColor(hovered ? new Color(255, 239, 196) : Color.LIGHT_GRAY);
+        FontMetrics bodyMetrics = g2.getFontMetrics();
+        int availableTextWidth = bounds.x + bounds.width - padding - contentX;
+        int lineY = titleY + 20;
+
+        for (String line : wrapText(weaponType.getDescription(), bodyMetrics, availableTextWidth)) {
+            g2.drawString(line, contentX, lineY);
+            lineY += bodyMetrics.getHeight();
+        }
+
+        for (String line : wrapText(weaponType.getDetailText(), bodyMetrics, availableTextWidth)) {
+            g2.drawString(line, contentX, lineY);
+            lineY += bodyMetrics.getHeight();
+        }
+
+        g2.setFont(oldFont);
+    }
+
+    private void drawLevelUpChoiceButton(Graphics2D g2, Rectangle bounds, PlayerUpgradeOption option,
+                                         Player player, boolean hovered) {
+        if (bounds == null || option == null) {
+            return;
+        }
+
+        g2.setColor(new Color(18, 18, 18, hovered ? 245 : 220));
+        g2.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 22, 22);
+        g2.setColor(hovered ? new Color(255, 220, 120) : Color.WHITE);
+        g2.drawRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 22, 22);
+
+        int padding = 14;
+        int iconSize = bounds.height - (padding * 2);
+        int contentX = bounds.x + padding;
+
+        BufferedImage icon = option.getIconImage();
+        if (icon != null) {
+            BufferedImage scaledIcon = ImageManager.scaleImageToHeight(icon, iconSize);
+            if (scaledIcon != null) {
+                int iconY = bounds.y + (bounds.height - scaledIcon.getHeight()) / 2;
+                g2.drawImage(scaledIcon, contentX, iconY, null);
+                contentX += scaledIcon.getWidth() + 14;
+            }
+        }
+
+        Font oldFont = g2.getFont();
+        g2.setFont(new Font("Arial", Font.BOLD, 22));
+        g2.setColor(hovered ? new Color(255, 220, 120) : Color.WHITE);
+
+        String label = option.getDisplayName(player);
+        int textY = bounds.y + ((bounds.height - g2.getFontMetrics().getHeight()) / 2) + g2.getFontMetrics().getAscent();
+        g2.drawString(label, contentX, textY);
+        g2.setFont(oldFont);
+    }
+
+    private List<String> wrapText(String text, FontMetrics metrics, int maxWidth) {
+        List<String> lines = new ArrayList<String>();
+        if (text == null || text.isEmpty()) {
+            return lines;
+        }
+
+        String[] words = text.split("\\s+");
+        StringBuilder currentLine = new StringBuilder();
+
+        for (String word : words) {
+            String candidate = currentLine.length() == 0 ? word : currentLine + " " + word;
+            if (metrics.stringWidth(candidate) <= maxWidth) {
+                currentLine.setLength(0);
+                currentLine.append(candidate);
+            } else {
+                if (currentLine.length() > 0) {
+                    lines.add(currentLine.toString());
+                }
+                currentLine.setLength(0);
+                currentLine.append(word);
+            }
+        }
+
+        if (currentLine.length() > 0) {
+            lines.add(currentLine.toString());
+        }
+
+        return lines;
     }
 
     private void handleWeaponSelectionClick(int mouseX, int mouseY) {

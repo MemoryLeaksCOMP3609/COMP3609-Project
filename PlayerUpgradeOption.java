@@ -1,17 +1,19 @@
+import java.awt.image.BufferedImage;
+
 public enum PlayerUpgradeOption {
-    MOVE_SPEED("Move Speed +1") {
+    MOVE_SPEED("Move Speed +1", "images/player/icons/moveSpeed.png") {
         @Override
         public void apply(Player player) {
             player.increaseMoveSpeed(1);
         }
     },
-    DAMAGE("Damage +0.15x") {
+    DAMAGE("Damage +15%", "images/player/icons/damage.png") {
         @Override
         public void apply(Player player) {
             player.increaseDamageMultiplier(0.15);
         }
     },
-    FIRE_RATE("Fire Rate +0.15x") {
+    FIRE_RATE("Fire Rate +15%", "images/player/icons/fireRate.png") {
         @Override
         public void apply(Player player) {
             player.increaseFireRateMultiplier(0.15);
@@ -20,25 +22,25 @@ public enum PlayerUpgradeOption {
         @Override
         public String getDisplayName(Player player) {
             if (player != null && player.getWeaponType() == WeaponType.FIRE_BALL) {
-                return "Orbit Rate +0.15x";
+                return "Orbit Rate +15%";
             }
 
             return super.getDisplayName(player);
         }
     },
-    MAX_HEALTH("Max Health +20") {
+    MAX_HEALTH("Max Health +20", "images/player/icons/maxHealth.png") {
         @Override
         public void apply(Player player) {
             player.increaseMaxHealth(20);
         }
     },
-    HEALTH_REGEN("Health Regen +1 / 5s") {
+    HEALTH_REGEN("Health Regen +1 / 5s", "images/player/icons/healthRegen.png") {
         @Override
         public void apply(Player player) {
             player.increaseHealthRegenPerInterval(1);
         }
     },
-    PROJECTILE_COUNT("Projectile Count +1") {
+    PROJECTILE_COUNT("Projectile Count +1", "images/player/icons/count.png") {
         @Override
         public void apply(Player player) {
             player.increaseProjectileCountMultiplier(1.0);
@@ -58,7 +60,7 @@ public enum PlayerUpgradeOption {
             return true;
         }
     },
-    PROJECTILE_SIZE("Projectile Size +0.25x") {
+    PROJECTILE_SIZE("Projectile Size +25%", "images/player/icons/size.png") {
         @Override
         public void apply(Player player) {
             player.increaseProjectileSizeMultiplier(0.25);
@@ -73,9 +75,12 @@ public enum PlayerUpgradeOption {
     };
 
     private final String displayName;
+    private final String iconPath;
+    private BufferedImage iconImage;
 
-    PlayerUpgradeOption(String displayName) {
+    PlayerUpgradeOption(String displayName, String iconPath) {
         this.displayName = displayName;
+        this.iconPath = iconPath;
     }
 
     public String getDisplayName() {
@@ -88,6 +93,13 @@ public enum PlayerUpgradeOption {
 
     public boolean isAvailable(Player player) {
         return true;
+    }
+
+    public BufferedImage getIconImage() {
+        if (iconImage == null) {
+            iconImage = ImageManager.loadBufferedImage(iconPath);
+        }
+        return iconImage;
     }
 
     public abstract void apply(Player player);

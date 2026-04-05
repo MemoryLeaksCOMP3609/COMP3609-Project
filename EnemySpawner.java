@@ -10,21 +10,42 @@ public class EnemySpawner {
     private final int worldWidth;
     private final int worldHeight;
     private final Random random;
+    private TestEnemySpawnType activeSpawnType;
     private long spawnCooldownRemaining;
 
     public EnemySpawner(int worldWidth, int worldHeight) {
         this.worldWidth = worldWidth;
         this.worldHeight = worldHeight;
         this.random = new Random();
+        this.activeSpawnType = TestEnemySpawnType.BAT;
         this.spawnCooldownRemaining = 0;
     }
 
     public void reset() {
+        activeSpawnType = TestEnemySpawnType.BAT;
         spawnCooldownRemaining = 0;
+    }
+
+    public void setActiveSpawnType(TestEnemySpawnType activeSpawnType) {
+        if (activeSpawnType == null) {
+            return;
+        }
+
+        this.activeSpawnType = activeSpawnType;
+        spawnCooldownRemaining = 0;
+    }
+
+    public TestEnemySpawnType getActiveSpawnType() {
+        return activeSpawnType;
     }
 
     public void update(long deltaTimeMs, PlayerSprite player, ArrayList<Enemy> enemies) {
         if (player == null) {
+            return;
+        }
+
+        if (hasLivingBoss(enemies)) {
+            spawnCooldownRemaining = 0;
             return;
         }
 
@@ -40,10 +61,19 @@ public class EnemySpawner {
         spawnCooldownRemaining = SPAWN_COOLDOWN_MS;
     }
 
+    private boolean hasLivingBoss(ArrayList<Enemy> enemies) {
+        for (Enemy enemy : enemies) {
+            if (enemy instanceof BossEnemy && enemy.isAlive()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private int countLivingEnemies(ArrayList<Enemy> enemies) {
         int count = 0;
         for (Enemy enemy : enemies) {
-            if (enemy instanceof BatEnemy && enemy.isAlive()) {
+            if (activeSpawnType.matches(enemy) && enemy.isAlive()) {
                 count++;
             }
         }
@@ -56,10 +86,10 @@ public class EnemySpawner {
             int distance = MIN_SPAWN_DISTANCE + random.nextInt(MAX_SPAWN_DISTANCE - MIN_SPAWN_DISTANCE + 1);
             int spawnX = clamp((int) Math.round(player.getWorldX() + Math.cos(angle) * distance), 0, worldWidth - 100);
             int spawnY = clamp((int) Math.round(player.getWorldY() + Math.sin(angle) * distance), 0, worldHeight - 100);
-            return new BatEnemy(spawnX, spawnY);
+            return activeSpawnType.createEnemy(spawnX, spawnY);
         }
 
-        return new BatEnemy(player.getWorldX() + MIN_SPAWN_DISTANCE, player.getWorldY());
+        return activeSpawnType.createEnemy(player.getWorldX() + MIN_SPAWN_DISTANCE, player.getWorldY());
     }
 
     private int clamp(int value, int min, int max) {

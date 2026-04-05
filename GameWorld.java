@@ -1,5 +1,6 @@
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.Random;
 
 public class GameWorld {
@@ -32,6 +33,8 @@ public class GameWorld {
     private ArrayList<DroppedCrystal> droppedCrystals;
     private int cameraX;
     private int cameraY;
+    private int viewportWidth;
+    private int viewportHeight;
 
     public GameWorld(int worldWidth, int worldHeight) {
         this.worldWidth = worldWidth;
@@ -59,6 +62,8 @@ public class GameWorld {
         this.droppedCrystals = new ArrayList<DroppedCrystal>();
         this.cameraX = 0;
         this.cameraY = 0;
+        this.viewportWidth = worldWidth;
+        this.viewportHeight = worldHeight;
     }
 
     public void initializeEntities(javax.swing.JPanel panel, int winCollectibles) {
@@ -88,6 +93,8 @@ public class GameWorld {
             return;
         }
 
+        viewportWidth = Math.max(1, panelWidth);
+        viewportHeight = Math.max(1, panelHeight);
         cameraX = player.getWorldX() - panelWidth / 2 + player.getWidth() / 2;
         cameraY = player.getWorldY() - panelHeight / 2 + player.getHeight() / 2;
         cameraX = Math.max(0, Math.min(cameraX, worldWidth - panelWidth));
@@ -116,7 +123,9 @@ public class GameWorld {
         }
 
         if (arrowSprite != null && player != null) {
-            arrowSprite.update(player.getScreenX(), player.getScreenY(), collectibles);
+            int playerCenterX = player.getScreenX() + player.getWidth() / 2;
+            int playerCenterY = player.getScreenY() + player.getHeight() / 2;
+            arrowSprite.update(playerCenterX, playerCenterY, viewportWidth, viewportHeight, collectibles);
         }
     }
 
@@ -188,6 +197,62 @@ public class GameWorld {
 
     public EnemySpawner getEnemySpawner() {
         return enemySpawner;
+    }
+
+    public boolean activateTestEnemySpawn(TestEnemySpawnType spawnType) {
+        if (spawnType == null) {
+            return false;
+        }
+
+        enemySpawner.setActiveSpawnType(spawnType);
+        purgeEnemiesExcept(spawnType);
+        clearEnemyProjectiles();
+        return true;
+    }
+
+    public boolean spawnTestBoss(TestBossSpawnType bossType) {
+        if (player == null || bossType == null) {
+            return false;
+        }
+
+        purgeAllEnemies();
+        clearEnemyProjectiles();
+
+        int spawnX = clamp(player.getWorldX() + 220, 0, worldWidth - 250);
+        int spawnY = clamp(player.getWorldY(), 0, worldHeight - 250);
+        enemies.add(bossType.createBoss(spawnX, spawnY));
+        return true;
+    }
+
+    private void purgeAllEnemies() {
+        Iterator<Enemy> iterator = enemies.iterator();
+        while (iterator.hasNext()) {
+            iterator.next();
+            iterator.remove();
+        }
+    }
+
+    private void purgeEnemiesExcept(TestEnemySpawnType allowedType) {
+        Iterator<Enemy> iterator = enemies.iterator();
+        while (iterator.hasNext()) {
+            Enemy enemy = iterator.next();
+            if (allowedType == null || !allowedType.matches(enemy)) {
+                iterator.remove();
+            }
+        }
+    }
+
+    private void clearEnemyProjectiles() {
+        Iterator<Projectile> iterator = projectiles.iterator();
+        while (iterator.hasNext()) {
+            if (iterator.next().isEnemyOwned()) {
+                iterator.remove();
+            }
+        }
+    }
+
+    private int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(value, max));
     }
 
     public void spawnCrystalDrop(Enemy enemy) {
