@@ -1,5 +1,6 @@
 public class Player {
     public static final int MAX_LEVEL = 20;
+    public static final double MAX_PROJECTILE_SIZE_MULTIPLIER = 2.0;
 
     private static final int BASE_MAX_HEALTH = 10000;
     private static final int BASE_MOVE_SPEED = 5;
@@ -119,7 +120,7 @@ public class Player {
 
     public void increaseProjectileSizeMultiplier(double amount) {
         if (amount > 0) {
-            projectileSizeMultiplier += amount;
+            projectileSizeMultiplier = Math.min(MAX_PROJECTILE_SIZE_MULTIPLIER, projectileSizeMultiplier + amount);
         }
     }
 

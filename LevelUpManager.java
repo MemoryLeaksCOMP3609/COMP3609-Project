@@ -54,7 +54,7 @@ public class LevelUpManager {
 
                 selectedUpgrade.apply(playerData);
                 pendingLevelUpChoices--;
-                sessionState.setActiveEffectName(selectedUpgrade.getDisplayName());
+                sessionState.setActiveEffectName(selectedUpgrade.getDisplayName(playerData));
                 if (infoPanel != null) {
                     infoPanel.updatePlayerStats(playerData);
                 }
@@ -85,7 +85,7 @@ public class LevelUpManager {
         int choiceCount = Math.min(3, choices.size());
         String[] labels = new String[choiceCount];
         for (int i = 0; i < choiceCount; i++) {
-            labels[i] = choices.get(i).getDisplayName();
+            labels[i] = choices.get(i).getDisplayName(playerData);
         }
 
         String title = "Level Up";
