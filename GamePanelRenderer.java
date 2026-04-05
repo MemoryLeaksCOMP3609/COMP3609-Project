@@ -6,11 +6,12 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 
 public class GamePanelRenderer {
-    private static final int PLAYER_HEALTH_BAR_WIDTH = 150;
+    private static final int PLAYER_HEALTH_BAR_WIDTH = 200;
     private static final int ENEMY_HEALTH_BAR_WIDTH = 100;
     private static final int HEALTH_BAR_HEIGHT = 10;
     private static final int HEALTH_BAR_VERTICAL_OFFSET = 12;
     private static final int HEALTH_BAR_BORDER_THICKNESS = 2;
+    private static final int EXPERIENCE_BAR_HEIGHT = 15;
 
     private final int worldWidth;
     private final int worldHeight;
@@ -58,6 +59,8 @@ public class GamePanelRenderer {
         if (applyGrayScale && doubleBufferImage != null) {
             drawGrayScaleOverlay(g2, panelWidth, panelHeight, doubleBufferImage);
         }
+
+        drawExperienceBar(g2, panelWidth, panelHeight, world.getPlayerData());
 
         if (sessionState.isGameOver()) {
             drawGameOver(g2, panelWidth, panelHeight, applyGrayScale);
@@ -253,5 +256,34 @@ public class GamePanelRenderer {
             8,
             8
         );
+    }
+
+    private void drawExperienceBar(Graphics2D g2, int panelWidth, int panelHeight, Player player) {
+        if (player == null || panelWidth <= 0 || panelHeight <= 0) {
+            return;
+        }
+
+        int barY = panelHeight - EXPERIENCE_BAR_HEIGHT;
+        float experienceRatio;
+        if (player.isMaxLevel()) {
+            experienceRatio = 1.0f;
+        } else if (player.getExperienceToNextLevel() > 0) {
+            experienceRatio = Math.max(0.0f, Math.min(1.0f, player.getExperience() / (float) player.getExperienceToNextLevel()));
+        } else {
+            experienceRatio = 0.0f;
+        }
+
+        int fillWidth = Math.round(panelWidth * experienceRatio);
+
+        g2.setColor(new Color(10, 18, 40, 220));
+        g2.fillRect(0, barY, panelWidth, EXPERIENCE_BAR_HEIGHT);
+
+        if (fillWidth > 0) {
+            g2.setColor(new Color(40, 140, 255, 230));
+            g2.fillRect(0, barY, fillWidth, EXPERIENCE_BAR_HEIGHT);
+        }
+
+        g2.setColor(new Color(185, 220, 255, 220));
+        g2.drawLine(0, barY, panelWidth - 1, barY);
     }
 }
