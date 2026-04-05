@@ -42,6 +42,7 @@ public class GamePanel extends JPanel {
     private InfoPanel infoPanel;
     private Thread gameLoopThread;
     private volatile boolean gameLoopRunning;
+    private Runnable renderCallback;
     private WeaponType selectedWeapon;
     private int viewportWidth;
     private int viewportHeight;
@@ -92,6 +93,7 @@ public class GamePanel extends JPanel {
 
         gameLoopThread = null;
         gameLoopRunning = false;
+        renderCallback = null;
         selectedWeapon = WeaponType.FIRE_ARROW;
     }
 
@@ -161,6 +163,7 @@ public class GamePanel extends JPanel {
             while (gameLoopRunning) {
                 try {
                     onGameTick();
+                    requestRender();
                 } catch (RuntimeException ex) {
                     System.err.println("Game loop crashed:");
                     ex.printStackTrace();
@@ -253,6 +256,13 @@ public class GamePanel extends JPanel {
             }
 
             loopMetrics.logProfilerIfReady(sessionState, world);
+        }
+    }
+
+    private void requestRender() {
+        Runnable callback = renderCallback;
+        if (callback != null) {
+            callback.run();
         }
     }
 
@@ -399,6 +409,14 @@ public class GamePanel extends JPanel {
     public void setViewportSize(int viewportWidth, int viewportHeight) {
         this.viewportWidth = Math.max(1, viewportWidth);
         this.viewportHeight = Math.max(1, viewportHeight);
+    }
+
+    public void setRenderCallback(Runnable renderCallback) {
+        this.renderCallback = renderCallback;
+    }
+
+    public void startLoop() {
+        startGameThread();
     }
 
     public void setLeftKeyPressed(boolean pressed) {

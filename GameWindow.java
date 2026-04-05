@@ -47,8 +47,6 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
 
     private BufferStrategy bufferStrategy;
     private BufferedImage screenImage;
-    private Thread renderThread;
-    private volatile boolean renderRunning;
     private boolean fullscreenActive;
     private boolean weaponSelectionActive;
     private Rectangle pauseButtonBounds;
@@ -68,8 +66,6 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         infoPanel = new InfoPanel();
         gamePanel = new GamePanel(infoPanel);
         fullscreenActive = false;
-        renderThread = null;
-        renderRunning = false;
         weaponSelectionActive = false;
         weaponOptions = WeaponType.values();
         weaponOptionBounds = new Rectangle[weaponOptions.length];
@@ -141,8 +137,10 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
 
     private void launchGame() {
         enterFullscreenMode();
-        startRenderLoop();
+        gamePanel.setRenderCallback(this::renderScreen);
+        gamePanel.startLoop();
         weaponSelectionActive = true;
+        renderScreen();
         requestFocusInWindow();
     }
 
@@ -178,35 +176,6 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
 
         bufferStrategy = getBufferStrategy();
         fullscreenActive = true;
-    }
-
-    private void startRenderLoop() {
-        if (renderRunning) {
-            return;
-        }
-
-        renderRunning = true;
-        renderThread = new Thread(() -> {
-            while (renderRunning) {
-                try {
-                    renderScreen();
-                } catch (RuntimeException ex) {
-                    System.err.println("Render loop crashed:");
-                    ex.printStackTrace();
-                    renderRunning = false;
-                    break;
-                }
-                try {
-                    Thread.sleep(FRAME_DELAY_MS);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
-            renderRunning = false;
-        }, "RenderLoopThread");
-        renderThread.setDaemon(true);
-        renderThread.start();
     }
 
     private void renderScreen() {
@@ -608,19 +577,7 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
     }
 
     private void closeApplication() {
-        renderRunning = false;
-        if (renderThread != null) {
-            renderThread.interrupt();
-            if (Thread.currentThread() != renderThread) {
-                try {
-                    renderThread.join(250);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-            renderThread = null;
-        }
-
+        gamePanel.setRenderCallback(null);
         gamePanel.stopGame();
 
         Window fullscreenWindow = device.getFullScreenWindow();
