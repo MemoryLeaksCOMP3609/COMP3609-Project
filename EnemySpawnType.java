@@ -34,6 +34,24 @@ public enum EnemySpawnType {
         public Enemy createEnemy(int startX, int startY) {
             return new FrostGhostEnemy(startX, startY);
         }
+    },
+    BOSS_PHASE_1("Boss Phase 1") {
+        @Override
+        public Enemy createEnemy(int startX, int startY) {
+            return new BossPhaseOneEnemy(startX, startY);
+        }
+    },
+    BOSS_PHASE_2("Boss Phase 2") {
+        @Override
+        public Enemy createEnemy(int startX, int startY) {
+            return new BossPhaseTwoEnemy(startX, startY);
+        }
+    },
+    BOSS_PHASE_3("Boss Phase 3") {
+        @Override
+        public Enemy createEnemy(int startX, int startY) {
+            return new BossPhaseThreeEnemy(startX, startY);
+        }
     };
 
     private final String displayName;

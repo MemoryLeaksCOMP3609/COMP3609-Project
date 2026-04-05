@@ -3,6 +3,7 @@ import java.util.Random;
 
 public class EnemySpawner {
     private static final int MAX_ACTIVE_SELECTED_ENEMIES = 3;
+    private static final int MAX_ACTIVE_SELECTED_BOSSES = 1;
     private static final long SPAWN_COOLDOWN_MS = 1200;
     private static final int MIN_SPAWN_DISTANCE = 280;
     private static final int MAX_SPAWN_DISTANCE = 520;
@@ -34,7 +35,8 @@ public class EnemySpawner {
             spawnCooldownRemaining = Math.max(0, spawnCooldownRemaining - deltaTimeMs);
         }
 
-        if (countLivingEnemiesOfSelectedType(enemies) >= MAX_ACTIVE_SELECTED_ENEMIES || spawnCooldownRemaining > 0) {
+        int maxActiveSelectedEnemies = isBossSelection() ? MAX_ACTIVE_SELECTED_BOSSES : MAX_ACTIVE_SELECTED_ENEMIES;
+        if (countLivingEnemiesOfSelectedType(enemies) >= maxActiveSelectedEnemies || spawnCooldownRemaining > 0) {
             return;
         }
 
@@ -79,6 +81,23 @@ public class EnemySpawner {
                 return enemy instanceof DarkGhostEnemy;
             case FROST_GHOST:
                 return enemy instanceof FrostGhostEnemy;
+            case BOSS_PHASE_1:
+                return enemy instanceof BossPhaseOneEnemy;
+            case BOSS_PHASE_2:
+                return enemy instanceof BossPhaseTwoEnemy;
+            case BOSS_PHASE_3:
+                return enemy instanceof BossPhaseThreeEnemy;
+            default:
+                return false;
+        }
+    }
+
+    private boolean isBossSelection() {
+        switch (selectedEnemyType) {
+            case BOSS_PHASE_1:
+            case BOSS_PHASE_2:
+            case BOSS_PHASE_3:
+                return true;
             default:
                 return false;
         }

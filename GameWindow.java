@@ -8,7 +8,7 @@ import javax.swing.*;
  */
 public class GameWindow extends JFrame 
         implements ActionListener, KeyListener {
-    private static final EnemySpawnType[] ENEMY_BUTTON_ORDER = {
+    private static final EnemySpawnType[] STANDARD_ENEMY_BUTTON_ORDER = {
         EnemySpawnType.BAT,
         EnemySpawnType.NORMAL_SKELETON,
         EnemySpawnType.TOXIC_SKELETON,
@@ -16,12 +16,18 @@ public class GameWindow extends JFrame
         EnemySpawnType.DARK_GHOST,
         EnemySpawnType.FROST_GHOST
     };
+    private static final EnemySpawnType[] BOSS_BUTTON_ORDER = {
+        EnemySpawnType.BOSS_PHASE_1,
+        EnemySpawnType.BOSS_PHASE_2,
+        EnemySpawnType.BOSS_PHASE_3
+    };
     
     // UI Components
     private Container c;
     private JPanel mainPanel;
     private JPanel buttonPanel;
     private JPanel enemyButtonPanel;
+    private JPanel bossButtonPanel;
     private GamePanel gamePanel;
     private InfoPanel infoPanel;
     
@@ -29,7 +35,8 @@ public class GameWindow extends JFrame
     private JButton startB;
     private JButton pauseB;
     private JButton exitB;
-    private JToggleButton[] enemyTypeButtons;
+    private JToggleButton[] standardEnemyTypeButtons;
+    private JToggleButton[] bossTypeButtons;
     
     // Managers
     private SoundManager soundManager;
@@ -93,21 +100,35 @@ public class GameWindow extends JFrame
         controlButtonPanel.add(pauseB);
         controlButtonPanel.add(exitB);
 
-        enemyButtonPanel = createEnemyButtonPanel();
+        JPanel spawnSelectionPanel = new JPanel();
+        spawnSelectionPanel.setLayout(new GridLayout(2, 1, 0, 4));
+        spawnSelectionPanel.setBackground(Color.DARK_GRAY);
+
+        enemyButtonPanel = createSpawnButtonRow("Enemies", STANDARD_ENEMY_BUTTON_ORDER, false);
+        bossButtonPanel = createSpawnButtonRow("Bosses", BOSS_BUTTON_ORDER, true);
+        spawnSelectionPanel.add(enemyButtonPanel);
+        spawnSelectionPanel.add(bossButtonPanel);
 
         buttonPanel.add(controlButtonPanel, BorderLayout.NORTH);
-        buttonPanel.add(enemyButtonPanel, BorderLayout.SOUTH);
+        buttonPanel.add(spawnSelectionPanel, BorderLayout.SOUTH);
     }
 
-    private JPanel createEnemyButtonPanel() {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 6, 4));
-        panel.setBackground(Color.DARK_GRAY);
+    private JPanel createSpawnButtonRow(String title, EnemySpawnType[] buttonOrder, boolean bossRow) {
+        JPanel rowPanel = new JPanel(new BorderLayout());
+        rowPanel.setBackground(Color.DARK_GRAY);
+
+        JLabel label = new JLabel(title + ":");
+        label.setForeground(Color.WHITE);
+        rowPanel.add(label, BorderLayout.WEST);
+
+        JPanel buttonRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 6, 4));
+        buttonRow.setBackground(Color.DARK_GRAY);
 
         ButtonGroup enemyButtonGroup = new ButtonGroup();
-        enemyTypeButtons = new JToggleButton[ENEMY_BUTTON_ORDER.length];
+        JToggleButton[] buttons = new JToggleButton[buttonOrder.length];
 
-        for (int i = 0; i < ENEMY_BUTTON_ORDER.length; i++) {
-            EnemySpawnType enemyType = ENEMY_BUTTON_ORDER[i];
+        for (int i = 0; i < buttonOrder.length; i++) {
+            EnemySpawnType enemyType = buttonOrder[i];
             JToggleButton button = new JToggleButton(enemyType.getDisplayName());
             button.setActionCommand(enemyType.name());
             button.addActionListener(this);
@@ -116,11 +137,18 @@ public class GameWindow extends JFrame
             }
 
             enemyButtonGroup.add(button);
-            panel.add(button);
-            enemyTypeButtons[i] = button;
+            buttonRow.add(button);
+            buttons[i] = button;
         }
 
-        return panel;
+        if (bossRow) {
+            bossTypeButtons = buttons;
+        } else {
+            standardEnemyTypeButtons = buttons;
+        }
+
+        rowPanel.add(buttonRow, BorderLayout.CENTER);
+        return rowPanel;
     }
     
     private void updateInfoPanel() {
@@ -168,15 +196,27 @@ public class GameWindow extends JFrame
             System.exit(0);
         }
 
-        for (EnemySpawnType enemyType : ENEMY_BUTTON_ORDER) {
-            if (command.equals(enemyType.name())) {
-                gamePanel.setSelectedEnemyType(enemyType);
-                requestGameFocus();
-                return;
-            }
+        EnemySpawnType selectedSpawnType = findSpawnTypeForCommand(command, STANDARD_ENEMY_BUTTON_ORDER);
+        if (selectedSpawnType == null) {
+            selectedSpawnType = findSpawnTypeForCommand(command, BOSS_BUTTON_ORDER);
+        }
+
+        if (selectedSpawnType != null) {
+            gamePanel.setSelectedEnemyType(selectedSpawnType);
+            requestGameFocus();
+            return;
         }
         
         requestGameFocus();
+    }
+
+    private EnemySpawnType findSpawnTypeForCommand(String command, EnemySpawnType[] buttonOrder) {
+        for (EnemySpawnType enemyType : buttonOrder) {
+            if (command.equals(enemyType.name())) {
+                return enemyType;
+            }
+        }
+        return null;
     }
     
     @Override

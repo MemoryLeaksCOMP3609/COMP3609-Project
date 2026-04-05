@@ -5,6 +5,7 @@ public abstract class BossEnemy extends Enemy {
                         int contactDamage, int scoreValue, int experienceReward, int startX, int startY) {
         super(name, maxHealth, movementSpeed, contactDamage, scoreValue, experienceReward, startX, startY);
         this.phaseNumber = phaseNumber;
+        this.spriteFacesLeftByDefault = false;
     }
 
     public int getPhaseNumber() {

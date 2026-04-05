@@ -164,8 +164,8 @@ public abstract class Enemy extends Sprite {
             return;
         }
 
-        double deltaX = targetX - worldX;
-        double deltaY = targetY - worldY;
+        double deltaX = targetX - getCenterX();
+        double deltaY = targetY - getCenterY();
         double distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
         if (distance <= stopDistance || distance == 0) {
@@ -186,7 +186,7 @@ public abstract class Enemy extends Sprite {
     }
 
     protected void faceToward(int targetX) {
-        updateFacingDirection(targetX - worldX);
+        updateFacingDirection(targetX - getCenterX());
     }
 
     protected void updateFacingDirection(double directionX) {
