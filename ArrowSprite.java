@@ -65,9 +65,8 @@ public class ArrowSprite {
         Collectible nearestCoin = findNearestUncollectedCoin(playerCenterX, playerCenterY, collectibles);
         
         if (nearestCoin != null) {
-            // Calculate the distance from player to nearest coin
-            double targetCenterX = nearestCoin.getScreenX() + width / 2.0;
-            double targetCenterY = nearestCoin.getScreenY() + height / 2.0;
+            double targetCenterX = getCollectibleCenterX(nearestCoin);
+            double targetCenterY = getCollectibleCenterY(nearestCoin);
             double dx = targetCenterX - playerCenterX;
             double dy = targetCenterY - playerCenterY;
             
@@ -129,8 +128,8 @@ public class ArrowSprite {
         
         for (Collectible collectible : collectibles) {
             if (!collectible.isCollected()) {
-                double dx = collectible.getScreenX() - fromX;
-                double dy = collectible.getScreenY() - fromY;
+                double dx = getCollectibleCenterX(collectible) - fromX;
+                double dy = getCollectibleCenterY(collectible) - fromY;
                 double distance = Math.sqrt(dx * dx + dy * dy);
                 
                 if (distance < minDistance) {
@@ -141,6 +140,14 @@ public class ArrowSprite {
         }
         
         return nearest;
+    }
+
+    private double getCollectibleCenterX(Collectible collectible) {
+        return collectible.getScreenX() + collectible.getWidth() / 2.0;
+    }
+
+    private double getCollectibleCenterY(Collectible collectible) {
+        return collectible.getScreenY() + collectible.getHeight() / 2.0;
     }
 
     private float clampAlpha(float alpha) {
@@ -167,8 +174,8 @@ public class ArrowSprite {
                 continue;
             }
 
-            double collectibleCenterX = collectible.getScreenX() + width / 2.0;
-            double collectibleCenterY = collectible.getScreenY() + height / 2.0;
+            double collectibleCenterX = getCollectibleCenterX(collectible);
+            double collectibleCenterY = getCollectibleCenterY(collectible);
             if (collectibleCenterX >= safeZoneMinX && collectibleCenterX <= safeZoneMaxX
                 && collectibleCenterY >= safeZoneMinY && collectibleCenterY <= safeZoneMaxY) {
                 return true;
