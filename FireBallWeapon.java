@@ -47,7 +47,7 @@ public class FireBallWeapon extends Weapon {
     }
 
     private Projectile createOrbitProjectile(PlayerSprite player, int damage, double projectileScale, double orbitAngle) {
-        return new Projectile(
+        return Projectile.create(
             player.getCenterX(),
             player.getCenterY(),
             0,

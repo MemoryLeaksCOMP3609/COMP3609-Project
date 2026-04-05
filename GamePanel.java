@@ -950,7 +950,7 @@ public class GamePanel extends JPanel {
         double hitboxLengthScale = enemyOwned ? 0.38 : 0.42;
         double hitboxThicknessScale = enemyOwned ? 0.18 : 0.16;
         double rotationRadians = Math.atan2(deltaY, deltaX);
-        return new Projectile(startX, startY, velocityX, velocityY, damage, enemyOwned,
+        return Projectile.create(startX, startY, velocityX, velocityY, damage, enemyOwned,
             frameDirectory, renderScale, true, rotationRadians, hitboxLengthScale, hitboxThicknessScale,
             weaponType, motionMode);
     }

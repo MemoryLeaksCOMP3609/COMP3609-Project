@@ -7,17 +7,16 @@ import java.awt.image.BufferedImage;
 import java.util.HashMap;
 import java.util.Map;
 
-public class Projectile {
+public abstract class Projectile {
     public enum MotionMode {
         STRAIGHT,
         HOMING,
         ORBIT
     }
 
-    private static final double MOVEMENT_REFERENCE_FRAME_MS = 40.0;
-    private static final long DEFAULT_FRAME_DURATION_MS = 50;
-    private static final long IMPACT_LINGER_MS = 120;
-    private static final long MAX_LIFETIME_MS = 5000;
+    private static final long DEFAULT_FRAME_DURATION_MS = 50L;
+    private static final long IMPACT_LINGER_MS = 120L;
+    private static final long DEFAULT_MAX_LIFETIME_MS = 5000L;
     private static final Map<String, BufferedImage[]> FRAME_CACHE = new HashMap<String, BufferedImage[]>();
 
     private double worldX;
@@ -35,10 +34,6 @@ public class Projectile {
     private final WeaponType weaponType;
     private final MotionMode motionMode;
 
-    private double homingTurnRateRadians;
-    private double orbitRadius;
-    private double orbitAngle;
-    private double orbitAngularSpeed;
     private long contactCooldownMs;
     private long impactLingerRemainingMs;
     private long lifetimeRemainingMs;
@@ -47,11 +42,11 @@ public class Projectile {
     private boolean active;
     private boolean impacted;
 
-    public Projectile(double worldX, double worldY, double velocityX, double velocityY,
-                      int damage, boolean enemyOwned, String frameDirectory,
-                      double renderScale, boolean baseImageFacesLeft, double rotationRadians,
-                      double hitboxLengthScale, double hitboxThicknessScale,
-                      WeaponType weaponType, MotionMode motionMode) {
+    protected Projectile(double worldX, double worldY, double velocityX, double velocityY,
+                         int damage, boolean enemyOwned, String frameDirectory,
+                         double renderScale, boolean baseImageFacesLeft, double rotationRadians,
+                         double hitboxLengthScale, double hitboxThicknessScale,
+                         WeaponType weaponType, MotionMode motionMode, long lifetimeRemainingMs) {
         this.worldX = worldX;
         this.worldY = worldY;
         this.velocityX = velocityX;
@@ -66,17 +61,39 @@ public class Projectile {
         this.hitboxThicknessScale = hitboxThicknessScale;
         this.weaponType = weaponType;
         this.motionMode = motionMode;
-        this.homingTurnRateRadians = 0.10;
-        this.orbitRadius = 120.0;
-        this.orbitAngle = rotationRadians;
-        this.orbitAngularSpeed = 0.0;
-        this.contactCooldownMs = 0;
-        this.impactLingerRemainingMs = 0;
-        this.lifetimeRemainingMs = motionMode == MotionMode.ORBIT ? Long.MAX_VALUE : MAX_LIFETIME_MS;
-        this.animationElapsedMs = 0;
+        this.contactCooldownMs = 0L;
+        this.impactLingerRemainingMs = 0L;
+        this.lifetimeRemainingMs = lifetimeRemainingMs;
+        this.animationElapsedMs = 0L;
         this.currentFrameIndex = 0;
         this.active = true;
         this.impacted = false;
+    }
+
+    public static Projectile create(double worldX, double worldY, double velocityX, double velocityY,
+                                    int damage, boolean enemyOwned, String frameDirectory,
+                                    double renderScale, boolean baseImageFacesLeft, double rotationRadians,
+                                    double hitboxLengthScale, double hitboxThicknessScale,
+                                    WeaponType weaponType, MotionMode motionMode) {
+        switch (motionMode) {
+            case HOMING:
+                return new HomingProjectile(worldX, worldY, velocityX, velocityY, damage, enemyOwned,
+                    frameDirectory, renderScale, baseImageFacesLeft, rotationRadians,
+                    hitboxLengthScale, hitboxThicknessScale, weaponType);
+            case ORBIT:
+                return new OrbitProjectile(worldX, worldY, velocityX, velocityY, damage, enemyOwned,
+                    frameDirectory, renderScale, baseImageFacesLeft, rotationRadians,
+                    hitboxLengthScale, hitboxThicknessScale, weaponType);
+            case STRAIGHT:
+            default:
+                return new StraightProjectile(worldX, worldY, velocityX, velocityY, damage, enemyOwned,
+                    frameDirectory, renderScale, baseImageFacesLeft, rotationRadians,
+                    hitboxLengthScale, hitboxThicknessScale, weaponType);
+        }
+    }
+
+    protected static long getDefaultMaxLifetimeMs() {
+        return DEFAULT_MAX_LIFETIME_MS;
     }
 
     public void update(long deltaTimeMs, GameWorld world, PlayerSprite player) {
@@ -84,82 +101,42 @@ public class Projectile {
             return;
         }
 
-        contactCooldownMs = Math.max(0, contactCooldownMs - deltaTimeMs);
+        contactCooldownMs = Math.max(0L, contactCooldownMs - deltaTimeMs);
 
         if (lifetimeRemainingMs != Long.MAX_VALUE) {
-            lifetimeRemainingMs = Math.max(0, lifetimeRemainingMs - deltaTimeMs);
-            if (lifetimeRemainingMs == 0) {
+            lifetimeRemainingMs = Math.max(0L, lifetimeRemainingMs - deltaTimeMs);
+            if (lifetimeRemainingMs == 0L) {
                 active = false;
                 return;
             }
         }
 
         if (impacted) {
-            impactLingerRemainingMs = Math.max(0, impactLingerRemainingMs - deltaTimeMs);
-            if (impactLingerRemainingMs == 0) {
+            impactLingerRemainingMs = Math.max(0L, impactLingerRemainingMs - deltaTimeMs);
+            if (impactLingerRemainingMs == 0L) {
                 active = false;
             }
             updateAnimation(deltaTimeMs);
             return;
         }
 
-        switch (motionMode) {
-            case HOMING:
-                updateHoming(deltaTimeMs, world);
-                break;
-            case ORBIT:
-                updateOrbit(deltaTimeMs, player);
-                break;
-            case STRAIGHT:
-            default:
-                updateStraight(deltaTimeMs);
-                break;
-        }
-
+        updateMotion(deltaTimeMs, world, player);
         updateAnimation(deltaTimeMs);
     }
 
-    private void updateStraight(long deltaTimeMs) {
-        double distanceScale = deltaTimeMs / MOVEMENT_REFERENCE_FRAME_MS;
-        worldX += velocityX * distanceScale;
-        worldY += velocityY * distanceScale;
-    }
+    protected abstract void updateMotion(long deltaTimeMs, GameWorld world, PlayerSprite player);
 
-    private void updateHoming(long deltaTimeMs, GameWorld world) {
-        Enemy nearestEnemy = findNearestEnemy(world);
-        if (nearestEnemy != null) {
-            double targetAngle = Math.atan2(nearestEnemy.getCenterY() - worldY, nearestEnemy.getCenterX() - worldX);
-            double currentAngle = Math.atan2(velocityY, velocityX);
-            double deltaAngle = normalizeAngle(targetAngle - currentAngle);
-            double angleStep = homingTurnRateRadians * (deltaTimeMs / MOVEMENT_REFERENCE_FRAME_MS);
-            double appliedTurn = Math.max(-angleStep, Math.min(angleStep, deltaAngle));
-            currentAngle += appliedTurn;
-
-            double speed = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
-            velocityX = Math.cos(currentAngle) * speed;
-            velocityY = Math.sin(currentAngle) * speed;
-            rotationRadians = currentAngle;
-        }
-
-        updateStraight(deltaTimeMs);
-    }
-
-    private void updateOrbit(long deltaTimeMs, PlayerSprite player) {
-        if (player == null) {
-            return;
-        }
-
-        orbitAngle += orbitAngularSpeed * deltaTimeMs;
-        worldX = player.getCenterX() + Math.cos(orbitAngle) * orbitRadius;
-        worldY = player.getCenterY() + Math.sin(orbitAngle) * orbitRadius;
-        rotationRadians = orbitAngle + Math.PI / 2.0;
-    }
-
-    private void updateAnimation(long deltaTimeMs) {
+    protected void updateAnimation(long deltaTimeMs) {
         if (frames.length > 1) {
             animationElapsedMs += deltaTimeMs;
             currentFrameIndex = (int) ((animationElapsedMs / DEFAULT_FRAME_DURATION_MS) % frames.length);
         }
+    }
+
+    protected void moveStraight(long deltaTimeMs, double movementReferenceFrameMs) {
+        double distanceScale = deltaTimeMs / movementReferenceFrameMs;
+        worldX += velocityX * distanceScale;
+        worldY += velocityY * distanceScale;
     }
 
     public void draw(Graphics2D g2, int cameraX, int cameraY) {
@@ -176,8 +153,7 @@ public class Projectile {
         AffineTransform originalTransform = g2.getTransform();
         AffineTransform transform = new AffineTransform();
         transform.translate(drawX + drawWidth / 2.0, drawY + drawHeight / 2.0);
-        double adjustedRotation = baseImageFacesLeft ? rotationRadians + Math.PI : rotationRadians;
-        transform.rotate(adjustedRotation);
+        transform.rotate(getAdjustedRotation());
         transform.translate(-drawWidth / 2.0, -drawHeight / 2.0);
         g2.setTransform(transform);
         g2.drawImage(currentFrame, 0, 0, drawWidth, drawHeight, null);
@@ -215,19 +191,22 @@ public class Projectile {
 
         AffineTransform transform = new AffineTransform();
         transform.translate(worldX, worldY);
-        double adjustedRotation = baseImageFacesLeft ? rotationRadians + Math.PI : rotationRadians;
-        transform.rotate(adjustedRotation);
+        transform.rotate(getAdjustedRotation());
         return transform.createTransformedShape(baseHitbox);
     }
 
     public boolean isOutOfBounds(int worldWidth, int worldHeight) {
-        if (motionMode == MotionMode.ORBIT) {
+        if (ignoresWorldBounds()) {
             return false;
         }
 
         double halfWidth = getBounds().getWidth() / 2.0;
         double halfHeight = getBounds().getHeight() / 2.0;
         return worldX < -halfWidth || worldY < -halfHeight || worldX > worldWidth + halfWidth || worldY > worldHeight + halfHeight;
+    }
+
+    protected boolean ignoresWorldBounds() {
+        return false;
     }
 
     public int getDamage() {
@@ -247,8 +226,8 @@ public class Projectile {
     }
 
     public void markImpact() {
-        if (motionMode == MotionMode.ORBIT) {
-            contactCooldownMs = 250;
+        if (usesContactCooldownOnImpact()) {
+            contactCooldownMs = getImpactCooldownMs();
             return;
         }
 
@@ -256,12 +235,20 @@ public class Projectile {
         impactLingerRemainingMs = IMPACT_LINGER_MS;
     }
 
+    protected boolean usesContactCooldownOnImpact() {
+        return false;
+    }
+
+    protected long getImpactCooldownMs() {
+        return 0L;
+    }
+
     public boolean hasImpacted() {
         return impacted;
     }
 
     public boolean canDamage() {
-        return contactCooldownMs <= 0 && !impacted;
+        return contactCooldownMs <= 0L && !impacted;
     }
 
     public WeaponType getWeaponType() {
@@ -273,16 +260,14 @@ public class Projectile {
     }
 
     public void configureHomingTurnRate(double homingTurnRateRadians) {
-        this.homingTurnRateRadians = homingTurnRateRadians;
+        // Default projectiles do not use homing turn rate.
     }
 
     public void configureOrbit(double orbitRadius, double orbitAngle, double orbitAngularSpeed) {
-        this.orbitRadius = orbitRadius;
-        this.orbitAngle = orbitAngle;
-        this.orbitAngularSpeed = orbitAngularSpeed;
+        // Default projectiles do not use orbit configuration.
     }
 
-    private Enemy findNearestEnemy(GameWorld world) {
+    protected Enemy findNearestEnemy(GameWorld world) {
         Enemy nearestEnemy = null;
         double nearestDistance = Double.MAX_VALUE;
 
@@ -303,7 +288,7 @@ public class Projectile {
         return nearestEnemy;
     }
 
-    private double normalizeAngle(double angle) {
+    protected double normalizeAngle(double angle) {
         while (angle > Math.PI) {
             angle -= Math.PI * 2.0;
         }
@@ -311,6 +296,50 @@ public class Projectile {
             angle += Math.PI * 2.0;
         }
         return angle;
+    }
+
+    protected double getWorldX() {
+        return worldX;
+    }
+
+    protected void setWorldX(double worldX) {
+        this.worldX = worldX;
+    }
+
+    protected double getWorldY() {
+        return worldY;
+    }
+
+    protected void setWorldY(double worldY) {
+        this.worldY = worldY;
+    }
+
+    protected double getVelocityX() {
+        return velocityX;
+    }
+
+    protected void setVelocityX(double velocityX) {
+        this.velocityX = velocityX;
+    }
+
+    protected double getVelocityY() {
+        return velocityY;
+    }
+
+    protected void setVelocityY(double velocityY) {
+        this.velocityY = velocityY;
+    }
+
+    protected double getRotationRadians() {
+        return rotationRadians;
+    }
+
+    protected void setRotationRadians(double rotationRadians) {
+        this.rotationRadians = rotationRadians;
+    }
+
+    private double getAdjustedRotation() {
+        return baseImageFacesLeft ? rotationRadians + Math.PI : rotationRadians;
     }
 
     private static BufferedImage[] loadFrames(String frameDirectory) {

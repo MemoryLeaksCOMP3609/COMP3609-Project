@@ -71,7 +71,7 @@ public abstract class Weapon {
         double hitboxLengthScale = 0.42;
         double hitboxThicknessScale = 0.16;
         double rotationRadians = Math.atan2(deltaY, deltaX);
-        return new Projectile(startX, startY, velocityX, velocityY, damage, false,
+        return Projectile.create(startX, startY, velocityX, velocityY, damage, false,
             projectileDirectory, getProjectileScale(playerData), true, rotationRadians,
             hitboxLengthScale, hitboxThicknessScale, weaponType, motionMode);
     }
