@@ -113,44 +113,78 @@ public class WorldGenerator {
             ArrayList<Collectible> existingCollectibles,
             int collectibleSize,
             int minDistanceFromSolid) {
+        int[] position = findCollectibleSpawnPosition(solidObjects, existingCollectibles,
+                collectibleSize, minDistanceFromSolid);
+        return createCoinCollectible(position[0], position[1], collectibleSize);
+    }
+
+    private int[] findCollectibleSpawnPosition(ArrayList<SolidObject> solidObjects,
+            ArrayList<Collectible> existingCollectibles,
+            int collectibleSize,
+            int minDistanceFromSolid) {
         final int EDGE_MARGIN = 50;
         final int MAX_ATTEMPTS = 1000;
 
-        int x = EDGE_MARGIN;
-        int y = EDGE_MARGIN;
-        boolean validPosition = false;
+        int maxX = EDGE_MARGIN + Math.max(0, worldWidth - 2 * EDGE_MARGIN - collectibleSize);
+        int maxY = EDGE_MARGIN + Math.max(0, worldHeight - 2 * EDGE_MARGIN - collectibleSize);
 
-        for (int attempts = 0; attempts < MAX_ATTEMPTS && !validPosition; attempts++) {
-            x = EDGE_MARGIN + random.nextInt(Math.max(1, worldWidth - 2 * EDGE_MARGIN - collectibleSize));
-            y = EDGE_MARGIN + random.nextInt(Math.max(1, worldHeight - 2 * EDGE_MARGIN - collectibleSize));
-            validPosition = isValidCollectiblePosition(x, y, solidObjects,
-                    existingCollectibles, minDistanceFromSolid);
+        for (int attempts = 0; attempts < MAX_ATTEMPTS; attempts++) {
+            int x = EDGE_MARGIN + random.nextInt(Math.max(1, maxX - EDGE_MARGIN + 1));
+            int y = EDGE_MARGIN + random.nextInt(Math.max(1, maxY - EDGE_MARGIN + 1));
+            if (isValidCollectiblePosition(x, y, collectibleSize, solidObjects,
+                    existingCollectibles, minDistanceFromSolid)) {
+                return new int[] { x, y };
+            }
         }
 
-        if (!validPosition) {
-            x = EDGE_MARGIN + random.nextInt(Math.max(1, worldWidth - 2 * EDGE_MARGIN - collectibleSize));
-            y = EDGE_MARGIN + random.nextInt(Math.max(1, worldHeight - 2 * EDGE_MARGIN - collectibleSize));
-            System.out.println("Warning: Could not find ideal position for collectible respawn");
+        for (int y = EDGE_MARGIN; y <= maxY; y += Math.max(10, collectibleSize / 2)) {
+            for (int x = EDGE_MARGIN; x <= maxX; x += Math.max(10, collectibleSize / 2)) {
+                if (isValidCollectiblePosition(x, y, collectibleSize, solidObjects,
+                        existingCollectibles, minDistanceFromSolid)) {
+                    System.out.println("Collectible spawn used grid fallback with preferred clearance");
+                    return new int[] { x, y };
+                }
+            }
         }
 
-        return createCoinCollectible(x, y, collectibleSize);
+        for (int y = EDGE_MARGIN; y <= maxY; y += Math.max(10, collectibleSize / 2)) {
+            for (int x = EDGE_MARGIN; x <= maxX; x += Math.max(10, collectibleSize / 2)) {
+                if (isValidCollectiblePosition(x, y, collectibleSize, solidObjects,
+                        existingCollectibles, 0)) {
+                    System.out.println("Collectible spawn relaxed distance check to avoid blocked placement");
+                    return new int[] { x, y };
+                }
+            }
+        }
+
+        System.out.println("Warning: No safe collectible spawn position found; using edge margin fallback");
+        return new int[] { EDGE_MARGIN, EDGE_MARGIN };
     }
 
     private boolean isValidCollectiblePosition(int x, int y,
+            int collectibleSize,
             ArrayList<SolidObject> solidObjects,
             ArrayList<Collectible> existingCollectibles,
             int minDistanceFromSolid) {
+        Rectangle2D.Double collectibleBounds = new Rectangle2D.Double(x, y, collectibleSize, collectibleSize);
+
         for (SolidObject solid : solidObjects) {
-            if (getDistanceFromRect(x, y, solid.getBoundingRectangle()) < minDistanceFromSolid) {
+            Rectangle2D.Double solidBounds = solid.getBoundingRectangle();
+            if (collectibleBounds.intersects(solidBounds)) {
+                return false;
+            }
+            if (getDistanceBetweenRects(collectibleBounds, solidBounds) < minDistanceFromSolid) {
                 return false;
             }
         }
         for (Collectible collectible : existingCollectibles) {
             if (collectible.isCollected())
                 continue;
-            double dist = Math.hypot(x - collectible.getX(), y - collectible.getY());
-            if (dist < minDistanceFromSolid)
+            Rectangle2D.Double existingBounds = collectible.getBoundingRectangle();
+            if (collectibleBounds.intersects(existingBounds)
+                    || getDistanceBetweenRects(collectibleBounds, existingBounds) < minDistanceFromSolid) {
                 return false;
+            }
         }
         return true;
     }
@@ -184,5 +218,23 @@ public class WorldGenerator {
         double closestX = Math.max(rect.getMinX(), Math.min(x, rect.getMaxX()));
         double closestY = Math.max(rect.getMinY(), Math.min(y, rect.getMaxY()));
         return Math.hypot(x - closestX, y - closestY);
+    }
+
+    private double getDistanceBetweenRects(Rectangle2D.Double first, Rectangle2D.Double second) {
+        double dx = 0;
+        if (first.getMaxX() < second.getMinX()) {
+            dx = second.getMinX() - first.getMaxX();
+        } else if (second.getMaxX() < first.getMinX()) {
+            dx = first.getMinX() - second.getMaxX();
+        }
+
+        double dy = 0;
+        if (first.getMaxY() < second.getMinY()) {
+            dy = second.getMinY() - first.getMaxY();
+        } else if (second.getMaxY() < first.getMinY()) {
+            dy = first.getMinY() - second.getMaxY();
+        }
+
+        return Math.hypot(dx, dy);
     }
 }

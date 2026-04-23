@@ -1,4 +1,5 @@
 import java.awt.image.BufferedImage;
+import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Random;
@@ -560,18 +561,61 @@ public class GameWorld {
             BufferedImage image = getExperienceCrystalImage(tier);
             if (image == null)
                 return;
-            int dropX = enemy.getCenterX() - image.getWidth() / 2;
-            int dropY = enemy.getCenterY() - image.getHeight() / 2;
-            droppedCrystals.add(new DroppedCrystal(dropX, dropY, image,
+            int[] dropPosition = findReachableDropPosition(enemy, image);
+            droppedCrystals.add(new DroppedCrystal(dropPosition[0], dropPosition[1], image,
                     DroppedCrystal.CrystalType.EXPERIENCE, tier));
         } else {
             if (healthCrystalImage == null)
                 return;
-            int dropX = enemy.getCenterX() - healthCrystalImage.getWidth() / 2;
-            int dropY = enemy.getCenterY() - healthCrystalImage.getHeight() / 2;
-            droppedCrystals.add(new DroppedCrystal(dropX, dropY, healthCrystalImage,
+            int[] dropPosition = findReachableDropPosition(enemy, healthCrystalImage);
+            droppedCrystals.add(new DroppedCrystal(dropPosition[0], dropPosition[1], healthCrystalImage,
                     DroppedCrystal.CrystalType.HEALTH, null));
         }
+    }
+
+    private int[] findReachableDropPosition(Enemy enemy, BufferedImage image) {
+        int itemWidth = Math.max(1, image.getWidth());
+        int itemHeight = Math.max(1, image.getHeight());
+        int baseX = clamp(enemy.getCenterX() - itemWidth / 2, 0, worldWidth - itemWidth);
+        int baseY = clamp(enemy.getCenterY() - itemHeight / 2, 0, worldHeight - itemHeight);
+
+        if (isDropPositionReachable(baseX, baseY, itemWidth, itemHeight)) {
+            return new int[] { baseX, baseY };
+        }
+
+        int step = Math.max(20, Math.max(itemWidth, itemHeight));
+        for (int radius = step; radius <= 240; radius += step) {
+            int[][] offsets = new int[][] {
+                    { -radius, 0 },
+                    { radius, 0 },
+                    { 0, -radius },
+                    { 0, radius },
+                    { -radius, -radius },
+                    { -radius, radius },
+                    { radius, -radius },
+                    { radius, radius }
+            };
+
+            for (int[] offset : offsets) {
+                int testX = clamp(baseX + offset[0], 0, worldWidth - itemWidth);
+                int testY = clamp(baseY + offset[1], 0, worldHeight - itemHeight);
+                if (isDropPositionReachable(testX, testY, itemWidth, itemHeight)) {
+                    return new int[] { testX, testY };
+                }
+            }
+        }
+
+        return new int[] { baseX, baseY };
+    }
+
+    private boolean isDropPositionReachable(int x, int y, int width, int height) {
+        Rectangle2D.Double dropBounds = new Rectangle2D.Double(x, y, width, height);
+        for (SolidObject solid : solidObjects) {
+            if (dropBounds.intersects(solid.getBoundingRectangle())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private DroppedCrystal.ExperienceTier rollExperienceTier(Enemy enemy) {
