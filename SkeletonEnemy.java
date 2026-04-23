@@ -17,6 +17,8 @@ public abstract class SkeletonEnemy extends Enemy {
     private long phaseDurationMs;
     private double dashStartX;
     private double dashStartY;
+    private double dashDirectionX;
+    private double dashDirectionY;
     private double dashTargetX;
     private double dashTargetY;
     private boolean dashHitApplied;
@@ -45,26 +47,28 @@ public abstract class SkeletonEnemy extends Enemy {
             return;
         }
 
-        faceToward(player.getCenterX());
-
         switch (attackPhase) {
             case NONE:
+                faceToward(player.getCenterX());
                 if (getDistanceTo(player) <= ATTACK_TRIGGER_DISTANCE && canAttack()) {
-                    startWindup();
+                    startWindup(player);
                 } else {
                     moveToward(player.getCenterX(), player.getCenterY(), deltaTimeMs);
                 }
                 break;
             case WINDUP:
+                updateFacingDirection(dashDirectionX);
                 advancePhase(deltaTimeMs);
                 if (phaseElapsedMs >= phaseDurationMs) {
-                    startDash(player);
+                    startDash();
                 }
                 break;
             case DASH:
+                updateFacingDirection(dashDirectionX);
                 advanceDash(deltaTimeMs);
                 break;
             case RECOVERY:
+                faceToward(player.getCenterX());
                 advancePhase(deltaTimeMs);
                 if (phaseElapsedMs >= phaseDurationMs) {
                     finishAttack();
@@ -103,34 +107,40 @@ public abstract class SkeletonEnemy extends Enemy {
         recoveryAnimation.addFrame(attackFrames[Math.min(3, attackFrames.length - 1)], RECOVERY_DURATION_MS);
     }
 
-    private void startWindup() {
+    private void startWindup(PlayerSprite player) {
         attackPhase = AttackPhase.WINDUP;
         phaseElapsedMs = 0L;
         phaseDurationMs = WINDUP_DURATION_MS;
         dashHitApplied = false;
         setAttackCooldown(ATTACK_COOLDOWN_MS);
+        cacheDashDirection(player);
+        updateFacingDirection(dashDirectionX);
         playPhaseAnimation(windupAnimation);
     }
 
-    private void startDash(PlayerSprite player) {
+    private void startDash() {
         attackPhase = AttackPhase.DASH;
         phaseElapsedMs = 0L;
         phaseDurationMs = DASH_DURATION_MS;
         dashStartX = worldX;
         dashStartY = worldY;
+        dashTargetX = dashStartX + dashDirectionX * DASH_DISTANCE;
+        dashTargetY = dashStartY + dashDirectionY * DASH_DISTANCE;
+        playPhaseAnimation(dashAnimation);
+    }
 
+    private void cacheDashDirection(PlayerSprite player) {
         double deltaX = player.getCenterX() - getCenterX();
         double deltaY = player.getCenterY() - getCenterY();
         double distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
         if (distance <= 0.001) {
-            deltaX = facingLeft ? -1.0 : 1.0;
-            deltaY = 0.0;
-            distance = 1.0;
+            dashDirectionX = facingLeft ? -1.0 : 1.0;
+            dashDirectionY = 0.0;
+            return;
         }
 
-        dashTargetX = dashStartX + (deltaX / distance) * DASH_DISTANCE;
-        dashTargetY = dashStartY + (deltaY / distance) * DASH_DISTANCE;
-        playPhaseAnimation(dashAnimation);
+        dashDirectionX = deltaX / distance;
+        dashDirectionY = deltaY / distance;
     }
 
     private void startRecovery() {
