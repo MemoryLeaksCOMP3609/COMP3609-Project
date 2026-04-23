@@ -18,11 +18,12 @@ public class GameCombatSystem {
     private final int experiencePerCollectible;
     private final int batStopDistance;
     private final double batBulletSpeed;
+    private final GameStats gameStats;
 
     public GameCombatSystem(GameWorld world, GameSessionState sessionState, SoundManager soundManager,
             long goldenTintDurationMs, long batFireIntervalMs,
             int experiencePerCollectible, int batStopDistance,
-            double batBulletSpeed) {
+            double batBulletSpeed, GameStats gameStats) {
         this.world = world;
         this.sessionState = sessionState;
         this.soundManager = soundManager;
@@ -31,6 +32,7 @@ public class GameCombatSystem {
         this.experiencePerCollectible = experiencePerCollectible;
         this.batStopDistance = batStopDistance;
         this.batBulletSpeed = batBulletSpeed;
+        this.gameStats = gameStats;
     }
 
     public void updateEnemies(long deltaTimeMs, PlayerSprite player) {
@@ -47,6 +49,18 @@ public class GameCombatSystem {
             if (enemy.shouldRemove()) {
                 if (enemy.consumeDefeatReward()) {
                     world.spawnCrystalDrop(enemy);
+                }
+                // Record enemy defeat in stats (before removal)
+                if (gameStats != null) {
+                    if (enemy instanceof BossEnemy) {
+                        gameStats.recordBossDefeated((BossEnemy) enemy);
+                        // Track BossPhaseThreeMicro defeats
+                        if (enemy instanceof BossPhaseThreeMicroEnemy) {
+                            world.trackBossPhaseThreeMicroDefeated();
+                        }
+                    } else {
+                        gameStats.recordEnemyDefeated(enemy);
+                    }
                 }
                 removedEnemies.add(enemy);
                 enemyIterator.remove();
@@ -170,10 +184,16 @@ public class GameCombatSystem {
                 sessionState.incrementCollectedCount();
                 soundManager.playClip("coinPickup", false);
                 player.activateSpeedBoost();
+                if (gameStats != null) {
+                    gameStats.recordSpeedBoost();
+                }
                 sessionState.setGoldenTintActive(true);
                 sessionState.setGoldenTintTimer(goldenTintDurationMs);
-                queueLevelUpChoices
-                        .accept(playerData != null ? playerData.gainExperience(experiencePerCollectible) : 0);
+                if (gameStats != null) {
+                    gameStats.recordHeartCollected();
+                }
+                int levelsGained = playerData != null ? playerData.gainExperience(experiencePerCollectible) : 0;
+                queueLevelUpChoices.accept(levelsGained);
                 world.respawnCollectedCollectible(collectible);
                 sessionState.setTotalCollectibles(world.getCollectibles().size());
                 break;
@@ -191,9 +211,17 @@ public class GameCombatSystem {
                 soundManager.playClip("crystal-sound", false);
                 if (playerData != null) {
                     if (crystal.getType() == DroppedCrystal.CrystalType.EXPERIENCE) {
-                        queueLevelUpChoices.accept(playerData.gainExperience(crystal.getExperienceValue()));
+                        int expValue = crystal.getExperienceValue();
+                        queueLevelUpChoices.accept(playerData.gainExperience(expValue));
+                        if (gameStats != null) {
+                            gameStats.recordCrystalCollected(crystal.getType(), crystal.getExperienceTier());
+                            gameStats.recordExperienceGained(expValue);
+                        }
                     } else if (crystal.getType() == DroppedCrystal.CrystalType.HEALTH) {
                         playerData.heal(HEALTH_PER_CRYSTAL);
+                        if (gameStats != null) {
+                            gameStats.recordCrystalCollected(crystal.getType(), null);
+                        }
                     }
                 }
                 crystalIterator.remove();

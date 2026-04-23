@@ -24,7 +24,10 @@ public class GameWorld {
         WARNING_FADE_OUT,
         DISCLAIMER_FADE_IN,
         DISCLAIMER_HOLD,
-        DISCLAIMER_FADE_OUT
+        DISCLAIMER_FADE_OUT,
+        SCOREBOARD_FADE_IN,
+        SCOREBOARD_HOLD,
+        SCOREBOARD_FADE_OUT
     }
 
     private OverlayState overlayState = OverlayState.NONE;
@@ -34,6 +37,7 @@ public class GameWorld {
 
     private static final float FADE_STEP_PER_MS = 1.0f / 500f; // 500 ms fade
     private static final long HOLD_DURATION_MS = 1500;
+    private static final long SCOREBOARD_HOLD_DURATION_MS = 8000;
 
     private BufferedImage warningImage;
     private BufferedImage disclaimer1Image;
@@ -51,6 +55,12 @@ public class GameWorld {
     private boolean grassBossDead = false;
     private boolean desertBossDead = false;
     private boolean iceBossDead = false;
+
+    private boolean bossPhaseThreeMicroDefeated = false;
+    private int bossPhaseThreeMicroCount = 0;
+    private int bossPhaseThreeMicroDefeatedCount = 0;
+
+    private Runnable onScoreboardComplete = null;
 
     private final int worldWidth;
     private final int worldHeight;
@@ -366,6 +376,34 @@ public class GameWorld {
                 }
                 break;
 
+            case SCOREBOARD_FADE_IN:
+                overlayAlpha = Math.min(1f, overlayAlpha + fadeStep);
+                if (overlayAlpha >= 1f) {
+                    overlayAlpha = 1f;
+                    overlayHoldMs = SCOREBOARD_HOLD_DURATION_MS;
+                    overlayState = OverlayState.SCOREBOARD_HOLD;
+                }
+                break;
+
+            case SCOREBOARD_HOLD:
+                overlayHoldMs -= deltaTimeMs;
+                if (overlayHoldMs <= 0) {
+                    overlayState = OverlayState.SCOREBOARD_FADE_OUT;
+                }
+                break;
+
+            case SCOREBOARD_FADE_OUT:
+                overlayAlpha = Math.max(0f, overlayAlpha - fadeStep);
+                if (overlayAlpha <= 0f) {
+                    overlayAlpha = 0f;
+                    overlayState = OverlayState.NONE;
+                    overlayImage = null;
+                    if (onScoreboardComplete != null) {
+                        onScoreboardComplete.run();
+                    }
+                }
+                break;
+
             default:
                 break;
         }
@@ -443,7 +481,7 @@ public class GameWorld {
     }
 
     public boolean isOverlayActive() {
-        return overlayState != OverlayState.NONE && overlayImage != null;
+        return overlayState != OverlayState.NONE && (overlayImage != null || isScoreboardActive());
     }
 
     public BufferedImage getOverlayImage() {
@@ -679,6 +717,11 @@ public class GameWorld {
         }
     }
 
+    public void triggerDeathScoreboard(Runnable onComplete) {
+        onScoreboardComplete = onComplete;
+        triggerScoreboard();
+    }
+
     public String getTerrainForCurrentLevel() {
         return terrainForLevel(currentLevel);
     }
@@ -745,5 +788,50 @@ public class GameWorld {
 
     public EnemySpawner getEnemySpawner() {
         return enemySpawner;
+    }
+    public void trackBossPhaseThreeMicroSpawned() {
+        bossPhaseThreeMicroCount++;
+    }
+
+    public void trackBossPhaseThreeMicroDefeated() {
+        bossPhaseThreeMicroDefeatedCount++;
+        if (bossPhaseThreeMicroCount > 0 && bossPhaseThreeMicroDefeatedCount >= bossPhaseThreeMicroCount) {
+            if (!bossPhaseThreeMicroDefeated) {
+                bossPhaseThreeMicroDefeated = true;
+                triggerScoreboard();
+            }
+        }
+    }
+
+    private void triggerScoreboard() {
+        overlayImage = null;
+        overlayAlpha = 0f;
+        overlayState = OverlayState.SCOREBOARD_FADE_IN;
+    }
+
+    public void setOnScoreboardCompleteCallback(Runnable callback) {
+        onScoreboardComplete = callback;
+    }
+
+    public boolean isScoreboardActive() {
+        return overlayState == OverlayState.SCOREBOARD_FADE_IN ||
+                overlayState == OverlayState.SCOREBOARD_HOLD ||
+                overlayState == OverlayState.SCOREBOARD_FADE_OUT;
+    }
+
+    public int getScoreboardState() {
+        if (overlayState == OverlayState.SCOREBOARD_FADE_IN)
+            return 0;
+        if (overlayState == OverlayState.SCOREBOARD_HOLD)
+            return 1;
+        if (overlayState == OverlayState.SCOREBOARD_FADE_OUT)
+            return 2;
+        return -1;
+    }
+
+    public void dismissScoreboard() {
+        if (overlayState == OverlayState.SCOREBOARD_HOLD) {
+            overlayState = OverlayState.SCOREBOARD_FADE_OUT;
+        }
     }
 }

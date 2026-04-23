@@ -259,6 +259,10 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
 
         if (keyCode == KeyEvent.VK_ESCAPE) {
             if (fullscreenActive) {
+                if (gamePanel.isScoreboardActive()) {
+                    gamePanel.dismissScoreboard();
+                    return;
+                }
                 if (exitConfirmationActive) {
                     hideExitConfirmation();
                 } else {
@@ -275,6 +279,13 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         }
 
         if (exitConfirmationActive || weaponSelectionActive || gamePanel.isLevelUpChoiceActive()) {
+            return;
+        }
+
+        if (gamePanel.isScoreboardActive()) {
+            if (keyCode == KeyEvent.VK_SPACE || keyCode == KeyEvent.VK_ENTER) {
+                gamePanel.dismissScoreboard();
+            }
             return;
         }
 
@@ -328,6 +339,11 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
     @Override
     public void mousePressed(MouseEvent e) {
         if (!fullscreenActive) {
+            return;
+        }
+
+        if (gamePanel.isScoreboardActive()) {
+            gamePanel.dismissScoreboard();
             return;
         }
 
@@ -422,14 +438,16 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         int mouseY = e.getY();
         mouseOverPauseButton = pauseButtonBounds != null && pauseButtonBounds.contains(mouseX, mouseY);
         mouseOverExitButton = exitButtonBounds != null && exitButtonBounds.contains(mouseX, mouseY);
-        mouseOverExitConfirmButton = exitConfirmButtonBounds != null && exitConfirmButtonBounds.contains(mouseX, mouseY);
+        mouseOverExitConfirmButton = exitConfirmButtonBounds != null
+                && exitConfirmButtonBounds.contains(mouseX, mouseY);
         mouseOverExitCancelButton = exitCancelButtonBounds != null && exitCancelButtonBounds.contains(mouseX, mouseY);
         for (int i = 0; i < testEnemyButtonBounds.length; i++) {
-            testEnemyButtonHovered[i] = testEnemyButtonBounds[i] != null && testEnemyButtonBounds[i].contains(mouseX, mouseY);
+            testEnemyButtonHovered[i] = testEnemyButtonBounds[i] != null
+                    && testEnemyButtonBounds[i].contains(mouseX, mouseY);
         }
         for (int i = 0; i < testBossButtonBounds.length; i++) {
             testBossButtonHovered[i] = testBossButtonBounds[i] != null
-                && testBossButtonBounds[i].contains(mouseX, mouseY);
+                    && testBossButtonBounds[i].contains(mouseX, mouseY);
         }
         updateChoiceHoverStates(mouseX, mouseY);
     }
@@ -445,17 +463,15 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
     private void updateOverlayButtonBounds(int screenWidth) {
         int rightX = screenWidth - BUTTON_MARGIN - BUTTON_WIDTH;
         pauseButtonBounds = new Rectangle(
-            rightX - BUTTON_WIDTH - BUTTON_GAP,
-            BUTTON_MARGIN,
-            BUTTON_WIDTH,
-            BUTTON_HEIGHT
-        );
+                rightX - BUTTON_WIDTH - BUTTON_GAP,
+                BUTTON_MARGIN,
+                BUTTON_WIDTH,
+                BUTTON_HEIGHT);
         exitButtonBounds = new Rectangle(
-            rightX,
-            BUTTON_MARGIN,
-            BUTTON_WIDTH,
-            BUTTON_HEIGHT
-        );
+                rightX,
+                BUTTON_MARGIN,
+                BUTTON_WIDTH,
+                BUTTON_HEIGHT);
     }
 
     private void updateTestButtonBounds(int screenWidth) {
@@ -496,11 +512,10 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         drawTestButtons(g2);
 
         drawOverlayButton(
-            g2,
-            pauseButtonBounds,
-            gamePanel.isGamePaused() ? "Resume" : "Pause",
-            mouseOverPauseButton
-        );
+                g2,
+                pauseButtonBounds,
+                gamePanel.isGamePaused() ? "Resume" : "Pause",
+                mouseOverPauseButton);
         drawOverlayButton(g2, exitButtonBounds, "Exit", mouseOverExitButton);
     }
 
@@ -519,7 +534,8 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         g2.setFont(new Font("Arial", Font.BOLD, 18));
         int textWidth = g2.getFontMetrics().stringWidth(label);
         int textX = bounds.x + (bounds.width - textWidth) / 2;
-        int textY = bounds.y + ((bounds.height - g2.getFontMetrics().getHeight()) / 2) + g2.getFontMetrics().getAscent();
+        int textY = bounds.y + ((bounds.height - g2.getFontMetrics().getHeight()) / 2)
+                + g2.getFontMetrics().getAscent();
         g2.drawString(label, textX, textY);
         g2.setFont(oldFont);
     }
@@ -527,43 +543,41 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
     private void drawTestButtons(Graphics2D g2) {
         for (int i = 0; i < testEnemyButtons.length; i++) {
             drawTestButton(
-                g2,
-                testEnemyButtonBounds[i],
-                testEnemyButtons[i].getDisplayName(),
-                testEnemyButtonHovered[i],
-                testEnemyButtons[i] == selectedTestEnemyButton,
-                false
-            );
+                    g2,
+                    testEnemyButtonBounds[i],
+                    testEnemyButtons[i].getDisplayName(),
+                    testEnemyButtonHovered[i],
+                    testEnemyButtons[i] == selectedTestEnemyButton,
+                    false);
         }
 
         for (int i = 0; i < testBossButtons.length; i++) {
             drawTestButton(
-                g2,
-                testBossButtonBounds[i],
-                testBossButtons[i].getDisplayName(),
-                testBossButtonHovered[i],
-                testBossButtons[i] == selectedTestBossButton,
-                false
-            );
+                    g2,
+                    testBossButtonBounds[i],
+                    testBossButtons[i].getDisplayName(),
+                    testBossButtonHovered[i],
+                    testBossButtons[i] == selectedTestBossButton,
+                    false);
         }
     }
 
     private void drawTestButton(Graphics2D g2, Rectangle bounds, String label, boolean hovered,
-                                boolean active, boolean disabled) {
+            boolean active, boolean disabled) {
         if (bounds == null) {
             return;
         }
 
         Color fillColor = disabled
-            ? new Color(45, 45, 45, 180)
-            : active
-                ? new Color(110, 30, 30, 220)
-                : new Color(0, 0, 0, hovered ? 210 : 170);
+                ? new Color(45, 45, 45, 180)
+                : active
+                        ? new Color(110, 30, 30, 220)
+                        : new Color(0, 0, 0, hovered ? 210 : 170);
         Color borderColor = disabled
-            ? new Color(140, 140, 140)
-            : active
-                ? new Color(255, 220, 120)
-                : hovered ? new Color(255, 220, 120) : Color.WHITE;
+                ? new Color(140, 140, 140)
+                : active
+                        ? new Color(255, 220, 120)
+                        : hovered ? new Color(255, 220, 120) : Color.WHITE;
         Color textColor = disabled ? new Color(170, 170, 170) : borderColor;
 
         g2.setColor(fillColor);
@@ -607,11 +621,10 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
 
         for (int i = 0; i < weaponOptions.length; i++) {
             weaponOptionBounds[i] = new Rectangle(
-                weaponStartX,
-                weaponStartY + (i * (weaponHeight + weaponGap)),
-                weaponWidth,
-                weaponHeight
-            );
+                    weaponStartX,
+                    weaponStartY + (i * (weaponHeight + weaponGap)),
+                    weaponWidth,
+                    weaponHeight);
         }
     }
 
@@ -642,12 +655,11 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         List<PlayerUpgradeOption> choices = gamePanel.getLevelUpChoices();
         for (int i = 0; i < choices.size() && i < levelUpOptionBounds.length; i++) {
             drawLevelUpChoiceButton(
-                g2,
-                levelUpOptionBounds[i],
-                choices.get(i),
-                gamePanel.getPlayerData(),
-                levelUpOptionHovered[i]
-            );
+                    g2,
+                    levelUpOptionBounds[i],
+                    choices.get(i),
+                    gamePanel.getPlayerData(),
+                    levelUpOptionHovered[i]);
         }
     }
 
@@ -679,7 +691,8 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         int buttonY = dialogY + 140;
 
         exitConfirmButtonBounds = new Rectangle(buttonStartX, buttonY, buttonWidth, buttonHeight);
-        exitCancelButtonBounds = new Rectangle(buttonStartX + buttonWidth + buttonGap, buttonY, buttonWidth, buttonHeight);
+        exitCancelButtonBounds = new Rectangle(buttonStartX + buttonWidth + buttonGap, buttonY, buttonWidth,
+                buttonHeight);
 
         drawChoiceButton(g2, exitConfirmButtonBounds, "Yes, Exit", mouseOverExitConfirmButton);
         drawChoiceButton(g2, exitCancelButtonBounds, "No, Stay", mouseOverExitCancelButton);
@@ -722,7 +735,8 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         g2.setFont(new Font("Arial", Font.BOLD, 22));
         int textWidth = g2.getFontMetrics().stringWidth(label);
         int textX = bounds.x + (bounds.width - textWidth) / 2;
-        int textY = bounds.y + ((bounds.height - g2.getFontMetrics().getHeight()) / 2) + g2.getFontMetrics().getAscent();
+        int textY = bounds.y + ((bounds.height - g2.getFontMetrics().getHeight()) / 2)
+                + g2.getFontMetrics().getAscent();
         g2.drawString(label, textX, textY);
         g2.setFont(oldFont);
     }
@@ -779,7 +793,7 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
     }
 
     private void drawLevelUpChoiceButton(Graphics2D g2, Rectangle bounds, PlayerUpgradeOption option,
-                                         Player player, boolean hovered) {
+            Player player, boolean hovered) {
         if (bounds == null || option == null) {
             return;
         }
@@ -808,7 +822,8 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         g2.setColor(hovered ? new Color(255, 220, 120) : Color.WHITE);
 
         String label = option.getDisplayName(player);
-        int textY = bounds.y + ((bounds.height - g2.getFontMetrics().getHeight()) / 2) + g2.getFontMetrics().getAscent();
+        int textY = bounds.y + ((bounds.height - g2.getFontMetrics().getHeight()) / 2)
+                + g2.getFontMetrics().getAscent();
         g2.drawString(label, contentX, textY);
         g2.setFont(oldFont);
     }
@@ -879,7 +894,8 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
 
         if (weaponSelectionActive) {
             for (int i = 0; i < weaponOptionBounds.length; i++) {
-                weaponOptionHovered[i] = weaponOptionBounds[i] != null && weaponOptionBounds[i].contains(mouseX, mouseY);
+                weaponOptionHovered[i] = weaponOptionBounds[i] != null
+                        && weaponOptionBounds[i].contains(mouseX, mouseY);
             }
         } else {
             for (int i = 0; i < weaponOptionHovered.length; i++) {
@@ -891,8 +907,8 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
             List<PlayerUpgradeOption> choices = gamePanel.getLevelUpChoices();
             for (int i = 0; i < levelUpOptionBounds.length; i++) {
                 levelUpOptionHovered[i] = i < choices.size()
-                    && levelUpOptionBounds[i] != null
-                    && levelUpOptionBounds[i].contains(mouseX, mouseY);
+                        && levelUpOptionBounds[i] != null
+                        && levelUpOptionBounds[i].contains(mouseX, mouseY);
             }
         } else {
             for (int i = 0; i < levelUpOptionHovered.length; i++) {
