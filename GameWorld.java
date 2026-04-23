@@ -32,7 +32,7 @@ public class GameWorld {
     private BufferedImage overlayImage = null; // warning or disclaimer image
 
     private static final float FADE_STEP_PER_MS = 1.0f / 500f; // 500 ms fade
-    private static final long HOLD_DURATION_MS = 1500;
+    private static final long HOLD_DURATION_MS = 5000;
 
     private BufferedImage warningImage;
     private BufferedImage disclaimer1Image;
