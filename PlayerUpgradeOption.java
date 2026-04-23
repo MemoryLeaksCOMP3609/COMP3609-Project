@@ -10,13 +10,13 @@ public enum PlayerUpgradeOption {
     DAMAGE("Damage +15%", "images/player/icons/damage.png") {
         @Override
         public void apply(Player player) {
-            player.increaseDamageMultiplier(0.15);
+            player.increaseDamageMultiplier(0.20);
         }
     },
     FIRE_RATE("Fire Rate +15%", "images/player/icons/fireRate.png") {
         @Override
         public void apply(Player player) {
-            player.increaseFireRateMultiplier(0.15);
+            player.increaseFireRateMultiplier(0.20);
         }
 
         @Override
@@ -31,13 +31,13 @@ public enum PlayerUpgradeOption {
     MAX_HEALTH("Max Health +20", "images/player/icons/maxHealth.png") {
         @Override
         public void apply(Player player) {
-            player.increaseMaxHealth(20);
+            player.increaseMaxHealth(50);
         }
     },
     HEALTH_REGEN("Health Regen +1 / 5s", "images/player/icons/healthRegen.png") {
         @Override
         public void apply(Player player) {
-            player.increaseHealthRegenPerInterval(1);
+            player.increaseHealthRegenPerInterval(10);
         }
     },
     PROJECTILE_COUNT("Projectile Count +1", "images/player/icons/count.png") {
