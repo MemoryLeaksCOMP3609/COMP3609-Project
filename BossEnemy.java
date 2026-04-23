@@ -29,7 +29,7 @@ public abstract class BossEnemy extends Enemy {
     private int lastKnownPlayerMoveSpeed;
 
     protected BossEnemy(String name, int phaseNumber, int maxHealth, int movementSpeed,
-                        int contactDamage, int scoreValue, int experienceReward, int startX, int startY) {
+            int contactDamage, int scoreValue, int experienceReward, int startX, int startY) {
         super(name, maxHealth, movementSpeed, contactDamage, scoreValue, experienceReward, startX, startY);
         this.phaseNumber = phaseNumber;
         this.spriteFacesLeftByDefault = false;
@@ -63,7 +63,7 @@ public abstract class BossEnemy extends Enemy {
 
         if (dashActive) {
             if (PixelCollision.intersects(getBoundingRectangle(), getCurrentBufferedImage(),
-                player.getBoundingRectangle(), player.getCurrentBufferedImage())) {
+                    player.getBoundingRectangle(), player.getCurrentBufferedImage())) {
                 dashActive = false;
                 dashDistanceRemaining = 0.0;
                 startAttackAnimation();
@@ -78,7 +78,8 @@ public abstract class BossEnemy extends Enemy {
                 return;
             }
 
-            moveTowardWithSpeedMultiplier(player.getCenterX(), player.getCenterY(), 0, deltaTimeMs, BOSS_DASH_SPEED_MULTIPLIER);
+            moveTowardWithSpeedMultiplier(player.getCenterX(), player.getCenterY(), 0, deltaTimeMs,
+                    BOSS_DASH_SPEED_MULTIPLIER);
             dashDistanceRemaining = Math.max(0.0, dashDistanceRemaining - dashDistanceThisTick);
             return;
         }
@@ -92,7 +93,7 @@ public abstract class BossEnemy extends Enemy {
         }
 
         if (canAttack() && PixelCollision.intersects(getBoundingRectangle(), getCurrentBufferedImage(),
-            player.getBoundingRectangle(), player.getCurrentBufferedImage())) {
+                player.getBoundingRectangle(), player.getCurrentBufferedImage())) {
             startAttackAnimation();
             return;
         }
@@ -117,10 +118,10 @@ public abstract class BossEnemy extends Enemy {
 
     public boolean isOnAttackImpactFrame() {
         return attackDamagePending
-            && currentAnimation == attackSequenceAnimation
-            && attackSequenceAnimation != null
-            && attackSequenceAnimation.getFrameCount() >= 3
-            && attackSequenceAnimation.getCurrentFrameIndex() == 2;
+                && currentAnimation == attackSequenceAnimation
+                && attackSequenceAnimation != null
+                && attackSequenceAnimation.getFrameCount() >= 3
+                && attackSequenceAnimation.getCurrentFrameIndex() == 2;
     }
 
     public void updateRangedAttackCooldown(long deltaTimeMs) {
@@ -142,7 +143,7 @@ public abstract class BossEnemy extends Enemy {
     protected void loadBossAnimations(String movePath, String attackPath, String deathPath, long frameDuration) {
         moveAnimation = loadStripAnimation(movePath, frameDuration, true);
         attackAnimation = buildAnimation(loadStripFrames(attackPath, 4),
-            buildUniformDurations(4, BOSS_ATTACK_ANIMATION_MS), false);
+                buildUniformDurations(4, BOSS_ATTACK_ANIMATION_MS), false);
         attackSequenceAnimation = attackAnimation;
         deathAnimationPath = deathPath;
         deathAnimationFrameDurationMs = frameDuration;
@@ -263,7 +264,7 @@ public abstract class BossEnemy extends Enemy {
 
         deathElapsedMs = Math.min(RUN_AWAY_DEATH_DURATION_MS, deathElapsedMs + deltaTimeMs);
         double moveDistance = lastKnownPlayerMoveSpeed * RUN_AWAY_SPEED_MULTIPLIER
-            * (deltaTimeMs / BOSS_DEATH_MOVEMENT_REFERENCE_FRAME_MS);
+                * (deltaTimeMs / BOSS_DEATH_MOVEMENT_REFERENCE_FRAME_MS);
         worldX += (int) Math.round(deathRunDirectionX * moveDistance);
         worldY += (int) Math.round(deathRunDirectionY * moveDistance);
 
@@ -320,6 +321,10 @@ public abstract class BossEnemy extends Enemy {
                 child.worldX = spawnCenterX - (int) Math.round(childBounds.getWidth() / 2.0);
                 child.worldY = spawnCenterY - (int) Math.round(childBounds.getHeight() / 2.0);
                 world.getEnemies().add(child);
+                // Track BossPhaseThreeMicroEnemy spawning
+                if (child instanceof BossPhaseThreeMicroEnemy) {
+                    world.trackBossPhaseThreeMicroSpawned();
+                }
             }
         }
     }
@@ -333,7 +338,8 @@ public abstract class BossEnemy extends Enemy {
     }
 
     private void renderWithAlpha(float alpha) {
-        // Alpha is applied during draw; this method only preserves the current fade computation path.
+        // Alpha is applied during draw; this method only preserves the current fade
+        // computation path.
     }
 
     protected abstract double getDashTriggerDistance();

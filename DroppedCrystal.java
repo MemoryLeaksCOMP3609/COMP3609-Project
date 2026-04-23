@@ -36,7 +36,8 @@ public class DroppedCrystal {
     private int screenY;
     private boolean collected;
 
-    public DroppedCrystal(int worldX, int worldY, BufferedImage image, CrystalType type, ExperienceTier experienceTier) {
+    public DroppedCrystal(int worldX, int worldY, BufferedImage image, CrystalType type,
+            ExperienceTier experienceTier) {
         this.worldX = worldX;
         this.worldY = worldY;
         this.image = image;
@@ -52,6 +53,10 @@ public class DroppedCrystal {
     public void updateScreenPosition(int cameraX, int cameraY) {
         screenX = worldX - cameraX;
         screenY = worldY - cameraY;
+    }
+
+    public ExperienceTier getExperienceTier() {
+        return experienceTier;
     }
 
     public void draw(Graphics2D g2) {

@@ -31,6 +31,7 @@ public class GamePanel extends JPanel {
     private final GamePanelRenderer renderer;
     private final GameLoopMetrics loopMetrics;
     private final LevelUpManager levelUpManager;
+    private final GameStats gameStats;
     private final Object stateLock;
 
     private BufferedImage doubleBufferImage;
@@ -63,12 +64,13 @@ public class GamePanel extends JPanel {
         inputState = new GameInputState();
         world = new GameWorld(WORLD_WIDTH, WORLD_HEIGHT);
         playerCollisionResolver = new PlayerCollisionResolver(MAX_PUSH_OUT_DISTANCE);
+        gameStats = new GameStats();
         combatSystem = new GameCombatSystem(
                 world, sessionState, SoundManager.getInstance(),
                 GOLDEN_TINT_DURATION, BAT_FIRE_INTERVAL_MS,
                 EXPERIENCE_PER_COLLECTIBLE,
-                BAT_STOP_DISTANCE, BAT_BULLET_SPEED);
-        renderer = new GamePanelRenderer(WORLD_WIDTH, WORLD_HEIGHT, GOLDEN_TINT_COLOR);
+                BAT_STOP_DISTANCE, BAT_BULLET_SPEED, gameStats);
+        renderer = new GamePanelRenderer(WORLD_WIDTH, WORLD_HEIGHT, GOLDEN_TINT_COLOR, gameStats);
         loopMetrics = new GameLoopMetrics();
         levelUpManager = new LevelUpManager();
         stateLock = new Object();
@@ -97,6 +99,25 @@ public class GamePanel extends JPanel {
             world.initializeEntities(this, TOTAL_COLLECTIBLES);
             sessionState.setCollectedCount(0);
             sessionState.setTotalCollectibles(world.getCollectibles().size());
+            if (world.getPlayerData() != null) {
+                gameStats.setPlayerHealthData(world.getPlayerData().getHealth(), world.getPlayerData().getMaxHealth());
+            }
+            world.setOnScoreboardCompleteCallback(this::onScoreboardComplete);
+        }
+    }
+
+    private void onScoreboardComplete() {
+        triggerGameOver(true);
+    }
+
+    public boolean isScoreboardActive() {
+        System.out.println("Scoreboard active: " + world.isScoreboardActive());
+        return world.isScoreboardActive();
+    }
+
+    public void dismissScoreboard() {
+        synchronized (stateLock) {
+            world.dismissScoreboard();
         }
     }
 
@@ -107,6 +128,7 @@ public class GamePanel extends JPanel {
 
             sessionState.resetForNewGame();
             screenGrayScaleFX = null;
+            gameStats.resetSession();
             createGameEntities();
             loopMetrics.reset();
             levelUpManager.reset();
@@ -229,7 +251,7 @@ public class GamePanel extends JPanel {
                     combatSystem.checkCollisions(
                             world.getPlayer(), world.getPlayerData(),
                             this::queueLevelUpChoices,
-                            () -> triggerGameOver(false));
+                            this::onPlayerDeath);
                     loopMetrics.recordCollisionUpdate(System.nanoTime() - t);
 
                     t = System.nanoTime();
@@ -257,6 +279,19 @@ public class GamePanel extends JPanel {
             loopMetrics.logProfilerIfReady(sessionState, world);
         }
     }
+
+    private void onPlayerDeath() {
+        soundManager.stopAll();
+        world.triggerDeathScoreboard(this::resetGame);
+    }
+
+    // private void onPlayerDeath() {
+    // sessionState.setGameRunning(false);
+    // soundManager.stopAll();
+    // world.triggerDeathScoreboard(this::resetGame);
+    // sessionState.setGameRunning(true); // keep loop alive for scoreboard to
+    // render
+    // }
 
     private void requestRender() {
         Runnable cb = renderCallback;
