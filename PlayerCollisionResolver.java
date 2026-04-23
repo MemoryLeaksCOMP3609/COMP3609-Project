@@ -10,14 +10,33 @@ public class PlayerCollisionResolver {
     }
 
     public boolean resolve(PlayerSprite player, ArrayList<SolidObject> solidObjects,
-                           int fallbackX, int fallbackY, int moveDirection) {
+            int fallbackX, int fallbackY, int moveDirection, TileMap tileMap) {
+
         Rectangle2D.Double playerBounds = player.getBoundingRectangle();
         BufferedImage playerImage = player.getCurrentCollisionMaskImage();
 
         for (SolidObject solid : solidObjects) {
             if (PixelCollision.intersects(playerBounds, playerImage,
-                solid.getBoundingRectangle(), solid.getImage())) {
+                    solid.getBoundingRectangle(), solid.getImage())) {
                 return pushPlayerOutOfSolid(player, solid, fallbackX, fallbackY, moveDirection);
+            }
+        }
+
+        // tilemap collision check
+        if (tileMap != null) {
+            int px = player.getWorldX();
+            int py = player.getWorldY();
+            int pw = (int) playerBounds.getWidth();
+            int ph = (int) playerBounds.getHeight();
+
+            // check all 4 corners of the player's bounding box
+            if (tileMap.isSolid(px, py) ||
+                    tileMap.isSolid(px + pw, py) ||
+                    tileMap.isSolid(px, py + ph) ||
+                    tileMap.isSolid(px + pw, py + ph)) {
+                player.setWorldX(fallbackX);
+                player.setWorldY(fallbackY);
+                return false;
             }
         }
 
@@ -25,7 +44,7 @@ public class PlayerCollisionResolver {
     }
 
     private boolean pushPlayerOutOfSolid(PlayerSprite player, SolidObject solid,
-                                         int fallbackX, int fallbackY, int moveDirection) {
+            int fallbackX, int fallbackY, int moveDirection) {
         int originalX = player.getWorldX();
         int originalY = player.getWorldY();
         int[] reverseDirection = getReverseStep(moveDirection);
@@ -48,7 +67,7 @@ public class PlayerCollisionResolver {
 
     private boolean isPlayerCollidingWithSolid(PlayerSprite player, SolidObject solid) {
         return PixelCollision.intersects(player.getBoundingRectangle(), player.getCurrentCollisionMaskImage(),
-            solid.getBoundingRectangle(), solid.getImage());
+                solid.getBoundingRectangle(), solid.getImage());
     }
 
     private boolean placePlayerAt(PlayerSprite player, int worldX, int worldY) {

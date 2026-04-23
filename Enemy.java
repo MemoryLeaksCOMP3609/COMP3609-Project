@@ -9,6 +9,7 @@ public abstract class Enemy extends Sprite {
     private static final int DEFAULT_FRAME_COUNT = 4;
     private static final double MOVEMENT_REFERENCE_FRAME_MS = 40.0;
     private static final long DAMAGE_FLASH_DURATION_MS = 120;
+    private long bossFootstepTimerMs = 0;
 
     protected final String name;
     protected int maxHealth;
@@ -39,7 +40,7 @@ public abstract class Enemy extends Sprite {
     protected boolean defeatRewardGranted;
 
     protected Enemy(String name, int maxHealth, int movementSpeed, int contactDamage,
-                    int scoreValue, int experienceReward, int startX, int startY) {
+            int scoreValue, int experienceReward, int startX, int startY) {
         super(null, startX, startY, 0, 0);
         this.name = name;
         this.maxHealth = maxHealth;
@@ -160,7 +161,7 @@ public abstract class Enemy extends Sprite {
     }
 
     protected void moveTowardWithSpeedMultiplier(int targetX, int targetY, int stopDistance,
-                                                 long deltaTimeMs, double speedMultiplier) {
+            long deltaTimeMs, double speedMultiplier) {
         if (!isAlive()) {
             return;
         }
@@ -184,6 +185,13 @@ public abstract class Enemy extends Sprite {
         worldY += (int) Math.round(directionY * moveDistance);
 
         setAnimationForState(EnemyState.MOVING);
+        if (this instanceof BossEnemy) {
+            bossFootstepTimerMs -= deltaTimeMs;
+            if (bossFootstepTimerMs <= 0) {
+                SoundManager.getInstance().playClip("boss-footsteps", false);
+                bossFootstepTimerMs = 500;
+            }
+        }
     }
 
     public void moveToward(int targetX, int targetY, int stopDistance, long deltaTimeMs) {

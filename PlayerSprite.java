@@ -11,7 +11,7 @@ import javax.swing.JPanel;
 public class PlayerSprite extends Sprite {
     private static final double MOVEMENT_REFERENCE_FRAME_MS = 40.0;
     private final Player playerData;
-    
+
     private int worldX;
     private int worldY;
     private double preciseWorldX;
@@ -33,12 +33,12 @@ public class PlayerSprite extends Sprite {
     private BufferedImage cachedCollisionMaskFrame;
     private static final double COLLISION_MASK_HEAD_TRIM_RATIO = 0.22;
     private static final double COLLISION_MASK_LEG_TRIM_RATIO = 0.30;
-    
+
     // Animation states
     public static final int STATE_IDLE = 0;
     public static final int STATE_RUN = 1;
     private int currentState;
-    
+
     // Movement direction
     public static final int DIR_LEFT = 1;
     public static final int DIR_RIGHT = 2;
@@ -49,16 +49,16 @@ public class PlayerSprite extends Sprite {
     public static final int DIR_DOWN_LEFT = 7;
     public static final int DIR_DOWN_RIGHT = 8;
     private int facingDirection;
-    
+
     // World bounds
     private int worldWidth;
     private int worldHeight;
-    
+
     // Sprite sheet configuration
     private static final int FRAME_WIDTH = 90;
     private static final int FRAME_HEIGHT = 130;
     private static final int FRAMES_PER_ROW = 5;
-    
+
     // Animation directions
     public static final int ANIM_DIR_UP = 0;
     public static final int ANIM_DIR_UP_RIGHT = 1;
@@ -68,33 +68,36 @@ public class PlayerSprite extends Sprite {
     public static final int ANIM_DIR_DOWN_LEFT = 5;
     public static final int ANIM_DIR_LEFT = 6;
     public static final int ANIM_DIR_UP_LEFT = 7;
-    
+
     // Animations
     private Animation idleAnim;
-    private Animation runUpAnim;         // UP - Row 0
-    private Animation runUpRightAnim;    // UP+RIGHT - Row 1
-    private Animation runRightAnim;      // RIGHT - Row 2
-    private Animation runDownRightAnim;  // DOWN+RIGHT - Row 3
-    private Animation runDownAnim;       // DOWN - Row 4
-    private Animation runDownLeftAnim;   // DOWN+LEFT - Row 5
-    private Animation runLeftAnim;       // LEFT - Row 6
-    private Animation runUpLeftAnim;     // UP+LEFT - Row 7
+    private Animation runUpAnim; // UP - Row 0
+    private Animation runUpRightAnim; // UP+RIGHT - Row 1
+    private Animation runRightAnim; // RIGHT - Row 2
+    private Animation runDownRightAnim; // DOWN+RIGHT - Row 3
+    private Animation runDownAnim; // DOWN - Row 4
+    private Animation runDownLeftAnim; // DOWN+LEFT - Row 5
+    private Animation runLeftAnim; // LEFT - Row 6
+    private Animation runUpLeftAnim; // UP+LEFT - Row 7
     private Animation currentAnimation;
-    
+
+    private long footstepTimerMs = 0;
+    private static final long FOOTSTEP_INTERVAL_MS = 350;
+
     // Sound manager reference
     private SoundManager soundManager;
-    
+
     /**
      * Utility method to clamp a value between min and max.
      */
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(value, max));
     }
-    
+
     public PlayerSprite(JPanel p, Player player, int xPos, int yPos, int worldW, int worldH) {
         super(p, xPos, yPos, 50, 50);
         playerData = player;
-        
+
         worldX = xPos;
         worldY = yPos;
         preciseWorldX = xPos;
@@ -110,37 +113,38 @@ public class PlayerSprite extends Sprite {
         cachedCollisionMaskFrame = null;
         width = 50;
         height = 50;
-        
+
         worldWidth = worldW;
         worldHeight = worldH;
-        
+
         currentState = STATE_IDLE;
         facingDirection = DIR_RIGHT;
-        
+
         // Initialize sound manager
         soundManager = SoundManager.getInstance();
-        
+
         // Load player sprite strip and set up animations using auto-detection
         loadSpriteAnimations();
     }
-    
+
     // Load sprite animations using StripAnimation class.
     private void loadSpriteAnimations() {
         // Use StripAnimation to load sprite strip and get animations
-        Map<Integer, Animation> animations = StripAnimation.loadSpriteAnimations("images/player/playerRunningStrip.png", RUN_FRAME_DURATION);
-        
+        Map<Integer, Animation> animations = StripAnimation.loadSpriteAnimations("images/player/playerRunningStrip.png",
+                RUN_FRAME_DURATION);
+
         if (animations == null || animations.isEmpty()) {
             System.out.println("Failed to load playerRunningStrip.png, falling back to player.png");
             image = ImageManager.loadImage("player.png");
             return;
         }
-        
+
         System.out.println("Sprite animations loaded successfully");
-        
+
         // Set sprite dimensions
         width = StripAnimation.FRAME_WIDTH;
         height = StripAnimation.FRAME_HEIGHT;
-        
+
         // Get animations from the map
         runUpAnim = animations.get(ANIM_DIR_UP);
         runUpRightAnim = animations.get(ANIM_DIR_UP_RIGHT);
@@ -150,7 +154,7 @@ public class PlayerSprite extends Sprite {
         runDownLeftAnim = animations.get(ANIM_DIR_DOWN_LEFT);
         runLeftAnim = animations.get(ANIM_DIR_LEFT);
         runUpLeftAnim = animations.get(ANIM_DIR_UP_LEFT);
-        
+
         idleAnim = new Animation(true);
         if (runDownAnim != null) {
             // Use the first DOWN frame as the default idle pose.
@@ -164,16 +168,16 @@ public class PlayerSprite extends Sprite {
                 }
             }
         }
-        
+
         // Set default animation
         currentAnimation = idleAnim;
         currentAnimation.start();
     }
-    
-    public void move(int direction, long deltaTimeMs) {
+
+    public void move(int direction, long deltaTimeMs, TileMap tileMap) {
         Animation animationToPlay = null;
         double moveDistance = getCurrentMoveSpeed() * (deltaTimeMs / MOVEMENT_REFERENCE_FRAME_MS);
-        
+
         switch (direction) {
             case DIR_LEFT:
                 preciseWorldX -= moveDistance;
@@ -228,26 +232,46 @@ public class PlayerSprite extends Sprite {
                 animationToPlay = runDownRightAnim;
                 break;
         }
-        
+
         // Set animation and play sound
-        setAnimationAndPlaySound(animationToPlay);
-        
+        setAnimationAndPlaySound(animationToPlay, tileMap);
+        footstepTimerMs -= deltaTimeMs;
+        if (footstepTimerMs <= 0) {
+            soundManager.playFootstep(resolveFootstepSound(tileMap));
+            footstepTimerMs = FOOTSTEP_INTERVAL_MS;
+        }
+
         // Clamp to world bounds
         preciseWorldX = clampToWorldBounds(preciseWorldX, width, worldWidth);
         preciseWorldY = clampToWorldBounds(preciseWorldY, height, worldHeight);
         syncPrecisePositionToWorldPosition();
     }
-    
-    private void setAnimationAndPlaySound(Animation anim) {
+
+    private void setAnimationAndPlaySound(Animation anim, TileMap tileMap) {
         if (anim != null) {
             currentAnimation = anim;
             if (!currentAnimation.isActive()) {
                 currentAnimation.start();
             }
         }
-        soundManager.startFootstep();
     }
-    
+
+    private String resolveFootstepSound(TileMap tileMap) {
+        if (tileMap == null)
+            return "path-footsteps";
+        int tileX = TileMap.pixelsToTiles(worldX + width / 2);
+        int tileY = TileMap.pixelsToTiles(worldY + height);
+        int index = tileMap.getTileIndex(tileX, tileY);
+        int level = tileMap.getCurrentLevel();
+        if (index == 44 && level == 1)
+            return "grass-footsteps";
+        if (index == 56 && level == 2)
+            return "sand-footsteps";
+        if (index == 56 && level == 3)
+            return "snow-footsteps";
+        return "path-footsteps";
+    }
+
     /**
      * Updates the screen position based on world position and camera offset.
      * Screen position = world position - camera position.
@@ -258,7 +282,7 @@ public class PlayerSprite extends Sprite {
         screenX = (int) Math.round(preciseScreenX);
         screenY = (int) Math.round(preciseScreenY);
     }
-    
+
     public void setIdle() {
         currentState = STATE_IDLE;
         if (idleAnim != null) {
@@ -270,7 +294,7 @@ public class PlayerSprite extends Sprite {
         // Stop footstep sound when player stops moving
         soundManager.stopFootstep();
     }
-    
+
     public void update(long deltaTimeMs) {
         syncDimensionsWithCurrentFrame();
         if (currentAnimation != null) {
@@ -281,7 +305,7 @@ public class PlayerSprite extends Sprite {
     public void update() {
         update(0);
     }
-    
+
     // Draws the player at screen position.
     public void draw(Graphics2D g2) {
         syncDimensionsWithCurrentFrame();
@@ -295,7 +319,7 @@ public class PlayerSprite extends Sprite {
             g2.drawImage(frameToDraw, screenX, screenY, width, height, null);
         }
     }
-    
+
     public Rectangle2D.Double getBoundingRectangle() {
         syncDimensionsWithCurrentFrame();
         return new Rectangle2D.Double(worldX, worldY, width, height);
@@ -322,19 +346,19 @@ public class PlayerSprite extends Sprite {
 
         return cachedCollisionMaskFrame;
     }
-    
+
     public int getWorldX() {
         return worldX;
     }
-    
+
     public int getWorldY() {
         return worldY;
     }
-    
+
     public int getScreenX() {
         return screenX;
     }
-    
+
     public int getScreenY() {
         return screenY;
     }
@@ -346,9 +370,7 @@ public class PlayerSprite extends Sprite {
     public int getCenterY() {
         return worldY + height / 2;
     }
-    
 
-    
     /**
      * Activates the speed boost (3x speed for 1 seconds).
      * Multiple activations reset the timer.
@@ -357,7 +379,7 @@ public class PlayerSprite extends Sprite {
         speedBoostActive = true;
         speedBoostTimer = SPEED_BOOST_DURATION;
     }
-    
+
     public void updateSpeedBoost(long deltaTime) {
         if (speedBoostActive) {
             speedBoostTimer -= deltaTime;
@@ -368,12 +390,12 @@ public class PlayerSprite extends Sprite {
             }
         }
     }
-    
+
     public void setWorldX(int x) {
         worldX = x;
         preciseWorldX = x;
     }
-    
+
     public void setWorldY(int y) {
         worldY = y;
         preciseWorldY = y;
