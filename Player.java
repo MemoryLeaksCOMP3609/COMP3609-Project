@@ -2,7 +2,7 @@ public class Player {
     public static final int MAX_LEVEL = 20;
     public static final double MAX_PROJECTILE_SIZE_MULTIPLIER = 2.0;
 
-    private static final int BASE_MAX_HEALTH = 5000; // 1000;
+    private static final int BASE_MAX_HEALTH = 300; // 1000;
     private static final int BASE_MOVE_SPEED = 5;
     private static final double BASE_DAMAGE_MULTIPLIER = 1.0;
     private static final double BASE_FIRE_RATE_MULTIPLIER = 1.0;
@@ -11,7 +11,7 @@ public class Player {
     private static final int BASE_HEALTH_REGEN_PER_INTERVAL = 1;
     private static final long HEALTH_REGEN_INTERVAL_MS = 5000L;
     private static final int BASE_LEVEL = 1;
-    private static final int BASE_EXPERIENCE_TO_NEXT_LEVEL = 10;
+    private static final int BASE_EXPERIENCE_TO_NEXT_LEVEL = 100;
     private static final double EXPERIENCE_GROWTH_RATE = 1.10;
 
     private int maxHealth;
