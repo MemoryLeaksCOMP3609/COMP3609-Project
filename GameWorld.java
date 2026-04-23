@@ -139,6 +139,7 @@ public class GameWorld {
         int spawnTileY;
 
         this.currentLevel = levelNumber;
+        enemySpawner.unlockMapMobSpawning();
 
         switch (levelNumber) {
             case 2:
@@ -373,6 +374,8 @@ public class GameWorld {
         if (player == null)
             return;
 
+        enemySpawner.lockMapMobSpawning();
+
         // Clear all existing enemies before spawning the boss
         enemies.clear();
 
@@ -513,6 +516,7 @@ public class GameWorld {
     public boolean spawnTestBoss(TestBossSpawnType bossType) {
         if (player == null || bossType == null)
             return false;
+        enemySpawner.lockMapMobSpawning();
         purgeAllEnemies();
         clearEnemyProjectiles();
         int spawnX = clamp(player.getWorldX() + 220, 0, worldWidth - 250);
