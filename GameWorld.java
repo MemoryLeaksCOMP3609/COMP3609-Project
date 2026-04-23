@@ -493,7 +493,8 @@ public class GameWorld {
             int playerCenterX = player.getScreenX() + player.getWidth() / 2;
             int playerCenterY = player.getScreenY() + player.getHeight() / 2;
             arrowSprite.update(playerCenterX, playerCenterY,
-                    viewportWidth, viewportHeight, collectibles);
+                    viewportWidth, viewportHeight, collectibles, levelPortal,
+                    isCurrentLevelBossDefeated(), cameraX, cameraY);
         }
     }
 
@@ -618,6 +619,19 @@ public class GameWorld {
                 return "ice";
             default:
                 return "grass";
+        }
+    }
+
+    private boolean isCurrentLevelBossDefeated() {
+        switch (currentLevel) {
+            case 1:
+                return grassBossDead;
+            case 2:
+                return desertBossDead;
+            case 3:
+                return iceBossDead;
+            default:
+                return false;
         }
     }
 

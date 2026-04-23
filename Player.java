@@ -11,7 +11,7 @@ public class Player {
     private static final int BASE_HEALTH_REGEN_PER_INTERVAL = 1;
     private static final long HEALTH_REGEN_INTERVAL_MS = 5000L;
     private static final int BASE_LEVEL = 1;
-    private static final int BASE_EXPERIENCE_TO_NEXT_LEVEL = 100;
+    private static final int BASE_EXPERIENCE_TO_NEXT_LEVEL = 10;
     private static final double EXPERIENCE_GROWTH_RATE = 1.10;
 
     private int maxHealth;
