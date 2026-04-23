@@ -336,7 +336,7 @@ public class GamePanel extends JPanel {
                 player.setWorldY(oldWorldY);
             }
 
-            if (portal != null && portal.collidesWithPlayer(player.getBoundingRectangle())) {
+            if (portal != null && portal.collidesWithPlayer(player)) {
                 player.setWorldX(oldWorldX);
                 player.setWorldY(oldWorldY);
 

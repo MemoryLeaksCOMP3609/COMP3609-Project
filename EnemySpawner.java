@@ -16,6 +16,7 @@ public class EnemySpawner {
     private long spawnCooldownRemaining;
 
     private boolean bossWasAlive = false;
+    private boolean mapMobSpawningLocked = false;
     private Runnable onBossDefeatedCallback = null;
 
     @FunctionalInterface
@@ -55,6 +56,7 @@ public class EnemySpawner {
         activeSpawnType = null;
         spawnCooldownRemaining = 0;
         bossWasAlive = false;
+        mapMobSpawningLocked = false;
     }
 
     public void setOnBossDefeatedCallback(Runnable callback) {
@@ -64,6 +66,20 @@ public class EnemySpawner {
     public void setActiveSpawnType(TestEnemySpawnType activeSpawnType) {
         this.activeSpawnType = activeSpawnType;
         spawnCooldownRemaining = 0;
+    }
+
+    public void lockMapMobSpawning() {
+        mapMobSpawningLocked = true;
+        spawnCooldownRemaining = 0;
+    }
+
+    public void unlockMapMobSpawning() {
+        mapMobSpawningLocked = false;
+        spawnCooldownRemaining = 0;
+    }
+
+    public boolean isMapMobSpawningLocked() {
+        return mapMobSpawningLocked;
     }
 
     public TestEnemySpawnType getActiveSpawnType() {
@@ -92,7 +108,7 @@ public class EnemySpawner {
         }
         bossWasAlive = bossAliveNow;
 
-        if (bossAliveNow) {
+        if (bossAliveNow || mapMobSpawningLocked) {
             spawnCooldownRemaining = 0;
             return;
         }

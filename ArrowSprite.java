@@ -1,7 +1,9 @@
 import java.awt.AlphaComposite;
+import java.awt.Color;
 import java.awt.Composite;
 import java.awt.Graphics2D;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 
@@ -15,7 +17,8 @@ public class ArrowSprite {
     private static final double VISIBLE_COIN_SAFE_ZONE_RATIO = 0.80;
     private static final float MIN_ALPHA = 0.0f;
     private static final float MAX_ALPHA = 1.0f;
-    private BufferedImage originalImage;
+    private final BufferedImage originalImage;
+    private final BufferedImage portalImage;
     private BufferedImage currentImage;
     private DisappearFX disappearFX;
     private int screenX;
@@ -35,11 +38,13 @@ public class ArrowSprite {
         if (originalImage != null) {
             width = originalImage.getWidth();
             height = originalImage.getHeight();
-            // Create a copy for pixel manipulation
             currentImage = ImageManager.copyImage(originalImage);
+            portalImage = tintImage(originalImage, new Color(70, 150, 255));
         } else {
             width = 32;
             height = 32;
+            currentImage = null;
+            portalImage = null;
         }
         
         disappearFX = new DisappearFX(0, 0, width, height, "images/Arrow.png");
@@ -51,7 +56,15 @@ public class ArrowSprite {
     }
     
     public void update(int playerCenterX, int playerCenterY, int viewportWidth, int viewportHeight,
-                       ArrayList<Collectible> collectibles) {
+                       ArrayList<Collectible> collectibles, LevelPortal portal, boolean pointToPortal,
+                       int cameraX, int cameraY) {
+        if (pointToPortal && portal != null) {
+            updateForPortal(playerCenterX, playerCenterY, viewportWidth, viewportHeight, portal, cameraX, cameraY);
+            return;
+        }
+
+        useDefaultImage();
+
         if (hasVisibleCollectibleInSafeZone(collectibles, viewportWidth, viewportHeight)) {
             screenX = playerCenterX - width / 2;
             screenY = playerCenterY - height / 2;
@@ -117,6 +130,54 @@ public class ArrowSprite {
         }
     }
 
+    private void updateForPortal(int playerCenterX, int playerCenterY, int viewportWidth, int viewportHeight,
+                                 LevelPortal portal, int cameraX, int cameraY) {
+        usePortalImage();
+
+        Rectangle2D.Double portalBounds = portal.getBoundingRectangle();
+        double portalCenterX = portalBounds.getCenterX() - cameraX;
+        double portalCenterY = portalBounds.getCenterY() - cameraY;
+
+        if (isPointInSafeZone(portalCenterX, portalCenterY, viewportWidth, viewportHeight)) {
+            screenX = playerCenterX - width / 2;
+            screenY = playerCenterY - height / 2;
+            rotationAngle = 0;
+            currentAlpha = 0.0f;
+            disappearFX.setPosition(screenX, screenY);
+            return;
+        }
+
+        double dx = portalCenterX - playerCenterX;
+        double dy = portalCenterY - playerCenterY;
+        double angleToPortal = Math.atan2(dy, dx);
+        double placementDistance = getViewportBoundDistance(
+                playerCenterX,
+                playerCenterY,
+                Math.cos(angleToPortal),
+                Math.sin(angleToPortal),
+                viewportWidth,
+                viewportHeight);
+        int arrowCenterX = playerCenterX + (int) Math.round(Math.cos(angleToPortal) * placementDistance);
+        int arrowCenterY = playerCenterY + (int) Math.round(Math.sin(angleToPortal) * placementDistance);
+        screenX = arrowCenterX - width / 2;
+        screenY = arrowCenterY - height / 2;
+
+        double arrowToPortalDx = portalCenterX - arrowCenterX;
+        double arrowToPortalDy = portalCenterY - arrowCenterY;
+        double arrowToPortalDistance = Math.sqrt(arrowToPortalDx * arrowToPortalDx + arrowToPortalDy * arrowToPortalDy);
+
+        if (arrowToPortalDistance >= 500) {
+            currentAlpha = 1.0f;
+        } else if (arrowToPortalDistance <= MIN_FADE_DISTANCE) {
+            currentAlpha = 0.0f;
+        } else {
+            currentAlpha = (float) ((arrowToPortalDistance - MIN_FADE_DISTANCE) / 200);
+        }
+        currentAlpha = clampAlpha(currentAlpha);
+        disappearFX.setPosition(screenX, screenY);
+        rotationAngle = Math.toDegrees(angleToPortal);
+    }
+
     // Find the nearest uncollected collectible from the list relative to a position.
     private Collectible findNearestUncollectedCoin(int fromX, int fromY, ArrayList<Collectible> collectibles) {
         if (collectibles == null || collectibles.isEmpty()) {
@@ -162,13 +223,6 @@ public class ArrowSprite {
             return false;
         }
 
-        double safeZoneWidth = viewportWidth * VISIBLE_COIN_SAFE_ZONE_RATIO;
-        double safeZoneHeight = viewportHeight * VISIBLE_COIN_SAFE_ZONE_RATIO;
-        double safeZoneMinX = (viewportWidth - safeZoneWidth) / 2.0;
-        double safeZoneMaxX = safeZoneMinX + safeZoneWidth;
-        double safeZoneMinY = (viewportHeight - safeZoneHeight) / 2.0;
-        double safeZoneMaxY = safeZoneMinY + safeZoneHeight;
-
         for (Collectible collectible : collectibles) {
             if (collectible.isCollected()) {
                 continue;
@@ -176,13 +230,60 @@ public class ArrowSprite {
 
             double collectibleCenterX = getCollectibleCenterX(collectible);
             double collectibleCenterY = getCollectibleCenterY(collectible);
-            if (collectibleCenterX >= safeZoneMinX && collectibleCenterX <= safeZoneMaxX
-                && collectibleCenterY >= safeZoneMinY && collectibleCenterY <= safeZoneMaxY) {
+            if (isPointInSafeZone(collectibleCenterX, collectibleCenterY, viewportWidth, viewportHeight)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private boolean isPointInSafeZone(double pointX, double pointY, int viewportWidth, int viewportHeight) {
+        double safeZoneWidth = viewportWidth * VISIBLE_COIN_SAFE_ZONE_RATIO;
+        double safeZoneHeight = viewportHeight * VISIBLE_COIN_SAFE_ZONE_RATIO;
+        double safeZoneMinX = (viewportWidth - safeZoneWidth) / 2.0;
+        double safeZoneMaxX = safeZoneMinX + safeZoneWidth;
+        double safeZoneMinY = (viewportHeight - safeZoneHeight) / 2.0;
+        double safeZoneMaxY = safeZoneMinY + safeZoneHeight;
+        return pointX >= safeZoneMinX && pointX <= safeZoneMaxX
+                && pointY >= safeZoneMinY && pointY <= safeZoneMaxY;
+    }
+
+    private void useDefaultImage() {
+        currentImage = originalImage != null ? ImageManager.copyImage(originalImage) : null;
+    }
+
+    private void usePortalImage() {
+        currentImage = portalImage != null ? ImageManager.copyImage(portalImage) : null;
+    }
+
+    private BufferedImage tintImage(BufferedImage source, Color tint) {
+        BufferedImage tinted = ImageManager.copyImage(source);
+        int tintRed = tint.getRed();
+        int tintGreen = tint.getGreen();
+        int tintBlue = tint.getBlue();
+
+        for (int y = 0; y < tinted.getHeight(); y++) {
+            for (int x = 0; x < tinted.getWidth(); x++) {
+                int argb = tinted.getRGB(x, y);
+                int alpha = (argb >>> 24) & 0xFF;
+                if (alpha == 0) {
+                    continue;
+                }
+
+                int red = (argb >>> 16) & 0xFF;
+                int green = (argb >>> 8) & 0xFF;
+                int blue = argb & 0xFF;
+
+                int tintedRed = (red * tintRed) / 255;
+                int tintedGreen = (green * tintGreen) / 255;
+                int tintedBlue = (blue * tintBlue) / 255;
+                int tintedArgb = (alpha << 24) | (tintedRed << 16) | (tintedGreen << 8) | tintedBlue;
+                tinted.setRGB(x, y, tintedArgb);
+            }
+        }
+
+        return tinted;
     }
 
     private double getViewportBoundDistance(int playerCenterX, int playerCenterY, double directionX, double directionY,
@@ -220,8 +321,7 @@ public class ArrowSprite {
      * Uses AlphaComposite for proper alpha/fade effect based on distance to coin.
      */
     public void draw(Graphics2D g2) {
-        // Get the alpha-applied image from DisappearFX
-        BufferedImage imageToDraw = disappearFX.getCurrentImage();
+        BufferedImage imageToDraw = currentImage;
         
         if (imageToDraw == null || currentAlpha <= 0.0f) {
             return;

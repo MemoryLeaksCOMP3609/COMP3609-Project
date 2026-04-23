@@ -107,14 +107,9 @@ public class LevelPortal {
         if (spriteSheet == null)
             return;
 
-        int col = currentFrame % 3;
-        int row = currentFrame / 3;
-
-        BufferedImage frame = spriteSheet.getSubimage(
-                col * frameWidth,
-                row * frameHeight,
-                frameWidth,
-                frameHeight);
+        BufferedImage frame = getCurrentFrameImage();
+        if (frame == null)
+            return;
 
         int screenX = worldX - cameraX;
         int screenY = worldY - cameraY;
@@ -122,12 +117,34 @@ public class LevelPortal {
         g2.drawImage(frame, screenX, screenY, frameWidth, frameHeight, null);
     }
 
-    public boolean collidesWithPlayer(Rectangle2D.Double playerBounds) {
-        return getBoundingRectangle().intersects(playerBounds);
+    public boolean collidesWithPlayer(PlayerSprite player) {
+        if (player == null) {
+            return false;
+        }
+
+        return PixelCollision.intersects(
+                getBoundingRectangle(),
+                getCurrentFrameImage(),
+                player.getBoundingRectangle(),
+                player.getCurrentCollisionMaskImage());
     }
 
     public Rectangle2D.Double getBoundingRectangle() {
         return new Rectangle2D.Double(worldX, worldY, frameWidth, frameHeight);
+    }
+
+    private BufferedImage getCurrentFrameImage() {
+        if (spriteSheet == null) {
+            return null;
+        }
+
+        int col = currentFrame % 3;
+        int row = currentFrame / 3;
+        return spriteSheet.getSubimage(
+                col * frameWidth,
+                row * frameHeight,
+                frameWidth,
+                frameHeight);
     }
 
     public int getWorldX() {

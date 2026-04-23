@@ -14,10 +14,13 @@ public abstract class BossEnemy extends Enemy {
 
     protected final int phaseNumber;
     private Animation attackSequenceAnimation;
+    private Animation dashAnimation;
     private boolean dashActive;
     private long attackAnimationRemainingMs;
     private boolean attackDamagePending;
     private double dashDistanceRemaining;
+    private double dashDirectionX;
+    private double dashDirectionY;
     private long rangedAttackCooldownMs;
     private String deathAnimationPath;
     private long deathAnimationFrameDurationMs;
@@ -34,10 +37,13 @@ public abstract class BossEnemy extends Enemy {
         this.phaseNumber = phaseNumber;
         this.spriteFacesLeftByDefault = false;
         this.attackSequenceAnimation = null;
+        this.dashAnimation = null;
         this.dashActive = false;
         this.attackAnimationRemainingMs = 0L;
         this.attackDamagePending = false;
         this.dashDistanceRemaining = 0.0;
+        this.dashDirectionX = 0.0;
+        this.dashDirectionY = 0.0;
         this.rangedAttackCooldownMs = 0L;
         this.deathAnimationPath = null;
         this.deathAnimationFrameDurationMs = 0L;
@@ -66,21 +72,34 @@ public abstract class BossEnemy extends Enemy {
                     player.getBoundingRectangle(), player.getCurrentBufferedImage())) {
                 dashActive = false;
                 dashDistanceRemaining = 0.0;
+                dashDirectionX = 0.0;
+                dashDirectionY = 0.0;
                 startAttackAnimation();
                 return;
             }
 
             double dashDistanceThisTick = movementSpeed * BOSS_DASH_SPEED_MULTIPLIER * (deltaTimeMs / 40.0);
-            if (dashDistanceRemaining <= dashDistanceThisTick) {
+            if (dashDistanceRemaining <= 0.0) {
                 dashActive = false;
                 dashDistanceRemaining = 0.0;
+                dashDirectionX = 0.0;
+                dashDirectionY = 0.0;
                 setAnimationForState(EnemyState.MOVING);
                 return;
             }
 
-            moveTowardWithSpeedMultiplier(player.getCenterX(), player.getCenterY(), 0, deltaTimeMs,
-                    BOSS_DASH_SPEED_MULTIPLIER);
-            dashDistanceRemaining = Math.max(0.0, dashDistanceRemaining - dashDistanceThisTick);
+            double moveDistance = Math.min(dashDistanceRemaining, dashDistanceThisTick);
+            updateFacingDirection(dashDirectionX);
+            worldX += (int) Math.round(dashDirectionX * moveDistance);
+            worldY += (int) Math.round(dashDirectionY * moveDistance);
+            dashDistanceRemaining = Math.max(0.0, dashDistanceRemaining - moveDistance);
+
+            if (dashDistanceRemaining <= 0.0) {
+                dashActive = false;
+                dashDirectionX = 0.0;
+                dashDirectionY = 0.0;
+                setAnimationForState(EnemyState.MOVING);
+            }
             return;
         }
 
@@ -99,9 +118,10 @@ public abstract class BossEnemy extends Enemy {
         }
 
         if (canAttack() && getDistanceToPlayer(player) <= getDashTriggerDistance()) {
+            cacheDashDirection(player);
             dashActive = true;
             dashDistanceRemaining = getMaxDashDistance();
-            setAnimationForState(EnemyState.MOVING);
+            playDashAnimation();
             return;
         }
 
@@ -142,9 +162,10 @@ public abstract class BossEnemy extends Enemy {
 
     protected void loadBossAnimations(String movePath, String attackPath, String deathPath, long frameDuration) {
         moveAnimation = loadStripAnimation(movePath, frameDuration, true);
-        attackAnimation = buildAnimation(loadStripFrames(attackPath, 4),
-                buildUniformDurations(4, BOSS_ATTACK_ANIMATION_MS), false);
+        BufferedImage[] attackFrames = loadStripFrames(attackPath, 4);
+        attackAnimation = buildAnimation(attackFrames, buildUniformDurations(4, BOSS_ATTACK_ANIMATION_MS), false);
         attackSequenceAnimation = attackAnimation;
+        loadDashAnimation(attackFrames);
         deathAnimationPath = deathPath;
         deathAnimationFrameDurationMs = frameDuration;
         deathAnimation = loadStripAnimation(deathPath, frameDuration, false);
@@ -196,6 +217,8 @@ public abstract class BossEnemy extends Enemy {
     protected void onDeathStarted() {
         dashActive = false;
         dashDistanceRemaining = 0.0;
+        dashDirectionX = 0.0;
+        dashDirectionY = 0.0;
         attackAnimationRemainingMs = 0L;
         attackDamagePending = false;
 
@@ -334,6 +357,39 @@ public abstract class BossEnemy extends Enemy {
         lastKnownPlayerCenterY = player.getCenterY();
         if (player.getPlayerData() != null) {
             lastKnownPlayerMoveSpeed = player.getPlayerData().getMoveSpeed();
+        }
+    }
+
+    private void cacheDashDirection(PlayerSprite player) {
+        double deltaX = player.getCenterX() - getCenterX();
+        double deltaY = player.getCenterY() - getCenterY();
+        double distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+        if (distance <= 0.001) {
+            dashDirectionX = facingLeft ? -1.0 : 1.0;
+            dashDirectionY = 0.0;
+            return;
+        }
+
+        dashDirectionX = deltaX / distance;
+        dashDirectionY = deltaY / distance;
+    }
+
+    private void loadDashAnimation(BufferedImage[] attackFrames) {
+        if (attackFrames.length == 0) {
+            dashAnimation = attackAnimation;
+            return;
+        }
+
+        dashAnimation = new Animation(false);
+        dashAnimation.addFrame(attackFrames[Math.min(1, attackFrames.length - 1)], BOSS_ATTACK_ANIMATION_MS);
+    }
+
+    private void playDashAnimation() {
+        state = EnemyState.ATTACKING;
+        currentAnimation = dashAnimation != null ? dashAnimation : attackAnimation;
+        if (currentAnimation != null) {
+            currentAnimation.start();
         }
     }
 
