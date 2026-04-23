@@ -4,7 +4,7 @@ import java.awt.image.BufferedImage;
 public abstract class BossEnemy extends Enemy {
     private static final long BOSS_ATTACK_COOLDOWN_MS = 3000L;
     private static final long BOSS_ATTACK_ANIMATION_MS = 500L;
-    private static final double BOSS_DASH_SPEED_MULTIPLIER = 10.0;
+    private static final double BOSS_DASH_SPEED_MULTIPLIER = 30.0;
     private static final double BOSS_DEATH_MOVEMENT_REFERENCE_FRAME_MS = 40.0;
     private static final long RUN_AWAY_DEATH_DURATION_MS = 3000L;
     private static final double RUN_AWAY_SPEED_MULTIPLIER = 1.5;
@@ -119,6 +119,7 @@ public abstract class BossEnemy extends Enemy {
 
         if (canAttack() && getDistanceToPlayer(player) <= getDashTriggerDistance()) {
             cacheDashDirection(player);
+            setAttackCooldown(BOSS_ATTACK_COOLDOWN_MS);
             dashActive = true;
             dashDistanceRemaining = getMaxDashDistance();
             playDashAnimation();

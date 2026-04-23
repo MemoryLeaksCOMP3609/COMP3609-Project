@@ -7,13 +7,13 @@ public enum PlayerUpgradeOption {
             player.increaseMoveSpeed(1);
         }
     },
-    DAMAGE("Damage +15%", "images/player/icons/damage.png") {
+    DAMAGE("Damage +20%", "images/player/icons/damage.png") {
         @Override
         public void apply(Player player) {
             player.increaseDamageMultiplier(0.20);
         }
     },
-    FIRE_RATE("Fire Rate +15%", "images/player/icons/fireRate.png") {
+    FIRE_RATE("Fire Rate +20%", "images/player/icons/fireRate.png") {
         @Override
         public void apply(Player player) {
             player.increaseFireRateMultiplier(0.20);
@@ -22,19 +22,19 @@ public enum PlayerUpgradeOption {
         @Override
         public String getDisplayName(Player player) {
             if (player != null && player.getWeaponType() == WeaponType.FIRE_BALL) {
-                return "Orbit Rate +15%";
+                return "Orbit Rate +20%";
             }
 
             return super.getDisplayName(player);
         }
     },
-    MAX_HEALTH("Max Health +20", "images/player/icons/maxHealth.png") {
+    MAX_HEALTH("Max Health +50", "images/player/icons/maxHealth.png") {
         @Override
         public void apply(Player player) {
             player.increaseMaxHealth(50);
         }
     },
-    HEALTH_REGEN("Health Regen +1 / 5s", "images/player/icons/healthRegen.png") {
+    HEALTH_REGEN("Health Regen +10 / 5s", "images/player/icons/healthRegen.png") {
         @Override
         public void apply(Player player) {
             player.increaseHealthRegenPerInterval(10);
