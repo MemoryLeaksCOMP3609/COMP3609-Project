@@ -31,8 +31,9 @@ public class LevelUpManager {
     }
 
     public void processPendingChoices(GameSessionState sessionState, GameWorld world,
-                                      GameInputState inputState, SoundManager soundManager) {
-        if (pendingLevelUpChoices <= 0 || levelUpDialogOpen || !sessionState.isGameRunning() || sessionState.isGameOver()) {
+            GameInputState inputState, SoundManager soundManager) {
+        if (pendingLevelUpChoices <= 0 || levelUpDialogOpen || !sessionState.isGameRunning()
+                || sessionState.isGameOver()) {
             return;
         }
 
@@ -66,8 +67,8 @@ public class LevelUpManager {
     }
 
     public void applyChoice(int selectedIndex, GameSessionState sessionState, GameWorld world,
-                            GameInputState inputState, SoundManager soundManager,
-                            InfoPanel infoPanel) {
+            GameInputState inputState, SoundManager soundManager,
+            InfoPanel infoPanel) {
         if (!levelUpDialogOpen || selectedIndex < 0 || selectedIndex >= currentChoices.size()) {
             return;
         }
@@ -97,8 +98,8 @@ public class LevelUpManager {
     }
 
     private void prepareChoices(Player playerData, GameSessionState sessionState,
-                                GameInputState inputState, SoundManager soundManager,
-                                GameWorld world) {
+            GameInputState inputState, SoundManager soundManager,
+            GameWorld world) {
         currentChoices.clear();
         for (PlayerUpgradeOption option : PlayerUpgradeOption.values()) {
             if (option.isAvailable(playerData)) {
@@ -114,7 +115,9 @@ public class LevelUpManager {
         levelUpDialogOpen = true;
         pausedBeforeDialog = sessionState.isGamePaused();
         sessionState.setGamePaused(true);
-        soundManager.stopClip("background");
+        soundManager.stopClip("grass-background");
+        soundManager.stopClip("sand-background");
+        soundManager.stopClip("snow-background");
         inputState.clearMovement();
         if (world.getPlayer() != null) {
             world.getPlayer().setIdle();
@@ -122,7 +125,7 @@ public class LevelUpManager {
     }
 
     private void closeChoiceSession(GameSessionState sessionState, GameWorld world,
-                                    GameInputState inputState, SoundManager soundManager) {
+            GameInputState inputState, SoundManager soundManager) {
         levelUpDialogOpen = false;
         currentChoices.clear();
         inputState.clearMovement();
@@ -132,7 +135,7 @@ public class LevelUpManager {
         sessionState.setGamePaused(pausedBeforeDialog);
         pausedBeforeDialog = false;
         if (!sessionState.isGameOver() && sessionState.isGameRunning() && !sessionState.isGamePaused()) {
-            soundManager.playBackgroundMusic();
+            soundManager.playBackgroundMusic(world.getTerrainForCurrentLevel());
         }
     }
 }

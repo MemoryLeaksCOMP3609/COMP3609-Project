@@ -20,9 +20,9 @@ public class GameCombatSystem {
     private final double batBulletSpeed;
 
     public GameCombatSystem(GameWorld world, GameSessionState sessionState, SoundManager soundManager,
-                            long goldenTintDurationMs, long batFireIntervalMs,
-                            int experiencePerCollectible, int batStopDistance,
-                            double batBulletSpeed) {
+            long goldenTintDurationMs, long batFireIntervalMs,
+            int experiencePerCollectible, int batStopDistance,
+            double batBulletSpeed) {
         this.world = world;
         this.sessionState = sessionState;
         this.soundManager = soundManager;
@@ -38,7 +38,7 @@ public class GameCombatSystem {
             return;
         }
 
-        world.getEnemySpawner().update(deltaTimeMs, player, world.getEnemies());
+        world.getEnemySpawner().update(deltaTimeMs, player, world.getEnemies(), world.getCurrentLevel());
 
         ArrayList<Enemy> removedEnemies = new ArrayList<Enemy>();
         Iterator<Enemy> enemyIterator = world.getEnemies().iterator();
@@ -57,7 +57,8 @@ public class GameCombatSystem {
             enemy.updateAttackCooldown(deltaTimeMs);
 
             if (enemy instanceof BatEnemy) {
-                double distanceToPlayer = getDistance(enemy.getCenterX(), enemy.getCenterY(), player.getCenterX(), player.getCenterY());
+                double distanceToPlayer = getDistance(enemy.getCenterX(), enemy.getCenterY(), player.getCenterX(),
+                        player.getCenterY());
                 if (enemy.isAlive()) {
                     updateBatEnemy(enemy, player, deltaTimeMs, distanceToPlayer);
                 }
@@ -92,15 +93,16 @@ public class GameCombatSystem {
         enemy.attack();
         if (enemy.canAttack()) {
             world.getProjectiles().add(createProjectile(enemy.getCenterX(), enemy.getCenterY(),
-                player.getCenterX(), player.getCenterY(), batBulletSpeed,
-                enemy.getContactDamage(), true, "images/spells/waterArrow", 0.10,
-                WeaponType.FIRE_ARROW, Projectile.MotionMode.STRAIGHT));
+                    player.getCenterX(), player.getCenterY(), batBulletSpeed,
+                    enemy.getContactDamage(), true, "images/spells/waterArrow", 0.10,
+                    WeaponType.FIRE_ARROW, Projectile.MotionMode.STRAIGHT));
             enemy.setAttackCooldown(batFireIntervalMs);
         }
     }
 
     private void updateBossRangedAttack(BossEnemy boss, PlayerSprite player) {
-        if (!boss.isAlive() || !boss.supportsRangedAttack() || boss.isBusyWithMeleeAttack() || !boss.canUseRangedAttack()) {
+        if (!boss.isAlive() || !boss.supportsRangedAttack() || boss.isBusyWithMeleeAttack()
+                || !boss.canUseRangedAttack()) {
             return;
         }
 
@@ -117,18 +119,17 @@ public class GameCombatSystem {
         }
 
         world.getProjectiles().add(createProjectile(
-            startX,
-            startY,
-            targetX,
-            targetY,
-            batBulletSpeed,
-            boss.getContactDamage(),
-            true,
-            "images/spells/waterArrow",
-            BOSS_RANGED_PROJECTILE_SCALE,
-            WeaponType.FIRE_ARROW,
-            Projectile.MotionMode.STRAIGHT
-        ));
+                startX,
+                startY,
+                targetX,
+                targetY,
+                batBulletSpeed,
+                boss.getContactDamage(),
+                true,
+                "images/spells/waterArrow",
+                BOSS_RANGED_PROJECTILE_SCALE,
+                WeaponType.FIRE_ARROW,
+                Projectile.MotionMode.STRAIGHT));
         boss.setRangedAttackCooldown(BOSS_RANGED_ATTACK_COOLDOWN_MS);
     }
 
@@ -144,7 +145,7 @@ public class GameCombatSystem {
     }
 
     public void checkCollisions(PlayerSprite player, Player playerData,
-                                IntConsumer queueLevelUpChoices, Runnable onPlayerDeath) {
+            IntConsumer queueLevelUpChoices, Runnable onPlayerDeath) {
         if (player == null || !sessionState.isGameRunning() || sessionState.isGamePaused()) {
             return;
         }
@@ -159,19 +160,20 @@ public class GameCombatSystem {
     }
 
     private void handleCollectibleCollisions(PlayerSprite player, Player playerData,
-                                             Rectangle2D.Double playerBounds,
-                                             IntConsumer queueLevelUpChoices) {
+            Rectangle2D.Double playerBounds,
+            IntConsumer queueLevelUpChoices) {
         for (Collectible collectible : world.getCollectibles()) {
             if (!collectible.isCollected()
-                && PixelCollision.intersects(playerBounds, player.getCurrentBufferedImage(),
-                collectible.getBoundingRectangle(), collectible.getCurrentBufferedImage())) {
+                    && PixelCollision.intersects(playerBounds, player.getCurrentBufferedImage(),
+                            collectible.getBoundingRectangle(), collectible.getCurrentBufferedImage())) {
                 collectible.collect();
                 sessionState.incrementCollectedCount();
                 soundManager.playClip("coinPickup", false);
                 player.activateSpeedBoost();
                 sessionState.setGoldenTintActive(true);
                 sessionState.setGoldenTintTimer(goldenTintDurationMs);
-                queueLevelUpChoices.accept(playerData != null ? playerData.gainExperience(experiencePerCollectible) : 0);
+                queueLevelUpChoices
+                        .accept(playerData != null ? playerData.gainExperience(experiencePerCollectible) : 0);
                 world.respawnCollectedCollectible(collectible);
                 sessionState.setTotalCollectibles(world.getCollectibles().size());
                 break;
@@ -180,12 +182,13 @@ public class GameCombatSystem {
     }
 
     private void handleCrystalCollisions(Player playerData, Rectangle2D.Double playerBounds,
-                                         IntConsumer queueLevelUpChoices) {
+            IntConsumer queueLevelUpChoices) {
         Iterator<DroppedCrystal> crystalIterator = world.getDroppedCrystals().iterator();
         while (crystalIterator.hasNext()) {
             DroppedCrystal crystal = crystalIterator.next();
             if (!crystal.isCollected() && playerBounds.intersects(crystal.getBoundingRectangle())) {
                 crystal.collect();
+                soundManager.playClip("crystal-sound", false);
                 if (playerData != null) {
                     if (crystal.getType() == DroppedCrystal.CrystalType.EXPERIENCE) {
                         queueLevelUpChoices.accept(playerData.gainExperience(crystal.getExperienceValue()));
@@ -213,6 +216,8 @@ public class GameCombatSystem {
                 }
                 if (enemy.canTakeDamage() && projectile.intersects(enemy.getBoundingRectangle())) {
                     enemy.takeDamage(projectile.getDamage());
+                    soundManager.playClip("spell-attack-noise", false);
+                    soundManager.playClip("enemy-hurt", false);
                     projectile.markImpact();
                     break;
                 }
@@ -221,7 +226,7 @@ public class GameCombatSystem {
     }
 
     private void handleSkeletonDashCollisions(PlayerSprite player, Player playerData,
-                                              Rectangle2D.Double playerBounds, Runnable onPlayerDeath) {
+            Rectangle2D.Double playerBounds, Runnable onPlayerDeath) {
         if (playerData == null) {
             return;
         }
@@ -237,11 +242,13 @@ public class GameCombatSystem {
             }
 
             if (PixelCollision.intersects(playerBounds, player.getCurrentBufferedImage(),
-                skeleton.getBoundingRectangle(), skeleton.getCurrentBufferedImage())) {
+                    skeleton.getBoundingRectangle(), skeleton.getCurrentBufferedImage())) {
                 playerData.takeDamage(skeleton.getContactDamage());
+                soundManager.playClip("player-hurt", false);
                 player.triggerDamageFlash();
                 skeleton.markDashHitApplied();
                 if (playerData.getHealth() <= 0) {
+                    soundManager.playClip("player-dies", false);
                     onPlayerDeath.run();
                 }
             }
@@ -249,7 +256,7 @@ public class GameCombatSystem {
     }
 
     private void handleBossContactCollisions(PlayerSprite player, Player playerData,
-                                             Rectangle2D.Double playerBounds, Runnable onPlayerDeath) {
+            Rectangle2D.Double playerBounds, Runnable onPlayerDeath) {
         if (playerData == null) {
             return;
         }
@@ -265,11 +272,13 @@ public class GameCombatSystem {
             }
 
             if (PixelCollision.intersects(playerBounds, player.getCurrentBufferedImage(),
-                enemy.getBoundingRectangle(), enemy.getCurrentBufferedImage())) {
+                    enemy.getBoundingRectangle(), enemy.getCurrentBufferedImage())) {
                 playerData.takeDamage(enemy.getContactDamage());
+                soundManager.playClip("player-hurt", false);
                 player.triggerDamageFlash();
                 boss.consumeAttackDamage();
                 if (playerData.getHealth() <= 0) {
+                    soundManager.playClip("player-dies", false);
                     onPlayerDeath.run();
                 }
             }
@@ -277,7 +286,7 @@ public class GameCombatSystem {
     }
 
     private void handleGhostContactCollisions(PlayerSprite player, Player playerData,
-                                              Rectangle2D.Double playerBounds, Runnable onPlayerDeath) {
+            Rectangle2D.Double playerBounds, Runnable onPlayerDeath) {
         if (playerData == null) {
             return;
         }
@@ -288,11 +297,13 @@ public class GameCombatSystem {
             }
 
             if (PixelCollision.intersects(playerBounds, player.getCurrentBufferedImage(),
-                enemy.getBoundingRectangle(), enemy.getCurrentBufferedImage())) {
+                    enemy.getBoundingRectangle(), enemy.getCurrentBufferedImage())) {
                 playerData.takeDamage(enemy.getContactDamage());
+                soundManager.playClip("player-hurt", false);
                 player.triggerDamageFlash();
                 enemy.setAttackCooldown(GHOST_CONTACT_COOLDOWN_MS);
                 if (playerData.getHealth() <= 0) {
+                    soundManager.playClip("player-dies", false);
                     onPlayerDeath.run();
                 }
             }
@@ -300,7 +311,7 @@ public class GameCombatSystem {
     }
 
     private void handleEnemyProjectileCollision(Projectile projectile, PlayerSprite player, Player playerData,
-                                                Runnable onPlayerDeath) {
+            Runnable onPlayerDeath) {
         if (projectile.hasImpacted()) {
             return;
         }
@@ -308,8 +319,10 @@ public class GameCombatSystem {
         if (projectile.intersects(player.getBoundingRectangle())) {
             if (playerData != null) {
                 playerData.takeDamage(projectile.getDamage());
+                soundManager.playClip("player-hurt", false);
                 player.triggerDamageFlash();
                 if (playerData.getHealth() <= 0) {
+                    soundManager.playClip("player-dies", false);
                     onPlayerDeath.run();
                 }
             }
@@ -318,9 +331,9 @@ public class GameCombatSystem {
     }
 
     private Projectile createProjectile(int startX, int startY, int targetX, int targetY,
-                                        double speed, int damage, boolean enemyOwned,
-                                        String frameDirectory, double renderScale,
-                                        WeaponType weaponType, Projectile.MotionMode motionMode) {
+            double speed, int damage, boolean enemyOwned,
+            String frameDirectory, double renderScale,
+            WeaponType weaponType, Projectile.MotionMode motionMode) {
         double deltaX = targetX - startX;
         double deltaY = targetY - startY;
         double distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
@@ -334,8 +347,8 @@ public class GameCombatSystem {
         double hitboxThicknessScale = enemyOwned ? 0.18 : 0.16;
         double rotationRadians = Math.atan2(deltaY, deltaX);
         return Projectile.create(startX, startY, velocityX, velocityY, damage, enemyOwned,
-            frameDirectory, renderScale, true, rotationRadians, hitboxLengthScale, hitboxThicknessScale,
-            weaponType, motionMode);
+                frameDirectory, renderScale, true, rotationRadians, hitboxLengthScale, hitboxThicknessScale,
+                weaponType, motionMode);
     }
 
     private double getDistance(int startX, int startY, int endX, int endY) {

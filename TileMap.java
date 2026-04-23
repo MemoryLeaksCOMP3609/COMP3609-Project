@@ -7,6 +7,8 @@ public class TileMap {
 
     private static final int TILE_SIZE = 100;
     private static final int TILE_SIZE_BITS = 6;
+    private static final int TILE_INDEX_OFFSET = -1;
+    private int currentLevel = 1;
 
     private int[][] tileIndices;
     private HashMap<Integer, Image> imageCache;
@@ -31,6 +33,14 @@ public class TileMap {
         System.out.println("Created TileMap: " + width + "x" + height + " (" + terrainType + ")");
     }
 
+    public void setCurrentLevel(int level) {
+        this.currentLevel = level;
+    }
+
+    public int getCurrentLevel() {
+        return currentLevel;
+    }
+
     public void setTileIndex(int x, int y, int tileIndex) {
         if (x >= 0 && x < mapWidth && y >= 0 && y < mapHeight) {
             tileIndices[x][y] = tileIndex;
@@ -46,18 +56,20 @@ public class TileMap {
 
     public Image getTile(int x, int y) {
         int tileIndex = getTileIndex(x, y);
-        if (tileIndex < 0) {
+        if (tileIndex < 0)
             return null;
+
+        int adjustedIndex = tileIndex + TILE_INDEX_OFFSET; // ← apply offset here
+        if (adjustedIndex < 0)
+            return null;
+
+        if (imageCache.containsKey(adjustedIndex)) {
+            return imageCache.get(adjustedIndex);
         }
 
-        if (imageCache.containsKey(tileIndex)) {
-            return imageCache.get(tileIndex);
-        }
-
-        String filename = "images/tiles/" + terrainType + "/" + terrainType + "Tile_" + tileIndex + ".png";
+        String filename = "images/tiles/" + terrainType + "/" + terrainType + "Tile_" + adjustedIndex + ".png";
         Image tileImage = new ImageIcon(filename).getImage();
-        imageCache.put(tileIndex, tileImage);
-
+        imageCache.put(adjustedIndex, tileImage);
         return tileImage;
     }
 
@@ -106,20 +118,59 @@ public class TileMap {
      * @param screenWidth  Screen width in pixels
      * @param screenHeight Screen height in pixels
      */
-    public void draw(Graphics2D g2, int offsetX, int offsetY, int screenWidth, int screenHeight) {
-        int firstTileX = pixelsToTiles(-offsetX);
-        int lastTileX = firstTileX + pixelsToTiles(screenWidth) + 1;
 
-        for (int y = 0; y < mapHeight; y++) {
+    public void draw(Graphics2D g2, int offsetX, int offsetY, int screenWidth, int screenHeight) {
+        int firstTileX = Math.max(0, pixelsToTiles(-offsetX));
+        int lastTileX = Math.min(mapWidth - 1, firstTileX + pixelsToTiles(screenWidth) + 1);
+
+        int firstTileY = Math.max(0, pixelsToTiles(-offsetY)); // ← was missing
+        int lastTileY = Math.min(mapHeight - 1, firstTileY + pixelsToTiles(screenHeight) + 1); // ← was missing
+
+        for (int y = firstTileY; y <= lastTileY; y++) { // ← was: for y=0 to mapHeight
             for (int x = firstTileX; x <= lastTileX; x++) {
                 Image image = getTile(x, y);
                 if (image != null) {
                     g2.drawImage(image,
                             tilesToPixels(x) + offsetX,
-                            tilesToPixels(y) + offsetY,
+                            tilesToPixels(y) + offsetY, // ← offsetY was missing here
+                            TILE_SIZE, TILE_SIZE,
                             null);
                 }
             }
         }
     }
+
+    // checks if a world pixel position is a blocked tile
+    public boolean isSolid(int worldX, int worldY) {
+        int tileX = pixelsToTiles(worldX);
+        int tileY = pixelsToTiles(worldY);
+
+        // Out of MAP bounds (not screen bounds) — block at world edge
+        if (tileX < 0 || tileX >= mapWidth || tileY < 0 || tileY >= mapHeight) {
+            return true;
+        }
+
+        int index = getTileIndex(tileX, tileY);
+
+        // -1 means out of bounds — treated as a solid wall so player can't leave the
+        // map
+        if (index == -1)
+            return false;
+
+        // un-walkable tiles: 44 = grass, 56 = desert/ice
+
+        // decided to allow player to leave the path (but leaving code in case need to
+        // limit player again)
+        // so, adding a 0 to every flag (since there is no tile past 55) —
+        // this is a bit hacky but it works with the current tile sets
+        switch (currentLevel) {
+            case 2:
+                return index == 560;
+            case 3:
+                return index == 560;
+            default:
+                return index == 440;
+        }
+    }
+
 }
