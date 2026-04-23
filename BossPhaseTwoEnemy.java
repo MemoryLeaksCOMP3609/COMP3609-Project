@@ -23,7 +23,7 @@ public class BossPhaseTwoEnemy extends BossEnemy {
 
     @Override
     protected double getMaxDashDistance() {
-        return 1000.0;
+        return 1200.0;
     }
 
     @Override

@@ -24,7 +24,7 @@ public class BossPhaseThreeMicroEnemy extends BossEnemy {
 
     @Override
     protected double getMaxDashDistance() {
-        return 312.5;
+        return 500.0;
     }
 
     @Override
