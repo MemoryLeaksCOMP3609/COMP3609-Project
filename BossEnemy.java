@@ -326,6 +326,10 @@ public abstract class BossEnemy extends Enemy {
         return false;
     }
 
+    public boolean hasSplitDeathSequence() {
+        return usesSplitDeathSequence();
+    }
+
     protected void spawnChildrenAroundBody(GameWorld world, ChildSpawnType childSpawnType) {
         if (world == null) {
             return;

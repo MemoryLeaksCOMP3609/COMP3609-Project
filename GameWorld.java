@@ -16,6 +16,7 @@ public class GameWorld {
     private static final int LEVEL_BOSS_GRASS = 10;
     private static final int LEVEL_BOSS_DESERT = 15;
     private static final int LEVEL_BOSS_ICE = 20;
+    private static final int FINAL_PHASE_THREE_MICRO_BOSS_TOTAL = 9;
 
     public enum OverlayState {
         NONE,
@@ -37,8 +38,6 @@ public class GameWorld {
 
     private static final float FADE_STEP_PER_MS = 1.0f / 500f; // 500 ms fade
     private static final long HOLD_DURATION_MS = 1500;
-    private static final long SCOREBOARD_HOLD_DURATION_MS = 8000;
-
     private BufferedImage warningImage;
     private BufferedImage disclaimer1Image;
     private BufferedImage disclaimer2Image;
@@ -56,9 +55,11 @@ public class GameWorld {
     private boolean desertBossDead = false;
     private boolean iceBossDead = false;
 
+    private boolean phaseThreeBossSpawned = false;
     private boolean bossPhaseThreeMicroDefeated = false;
     private int bossPhaseThreeMicroCount = 0;
     private int bossPhaseThreeMicroDefeatedCount = 0;
+    private boolean finalVictoryAchieved = false;
 
     private Runnable onScoreboardComplete = null;
 
@@ -149,8 +150,17 @@ public class GameWorld {
         int spawnTileX;
         int spawnTileY;
 
+        completeSplitBossDeathsBeforeMapChange();
         this.currentLevel = levelNumber;
-        enemySpawner.unlockMapMobSpawning();
+        if (shouldKeepMobSpawningLocked()) {
+            enemySpawner.lockMapMobSpawning();
+            if (finalVictoryAchieved) {
+                enemies.clear();
+                clearEnemyProjectiles();
+            }
+        } else {
+            enemySpawner.unlockMapMobSpawning();
+        }
 
         switch (levelNumber) {
             case 2:
@@ -273,6 +283,23 @@ public class GameWorld {
         projectiles = new ArrayList<>();
         droppedCrystals = new ArrayList<>();
         enemySpawner.reset();
+        overlayState = OverlayState.NONE;
+        overlayAlpha = 0f;
+        overlayHoldMs = 0;
+        overlayImage = null;
+        bossSpawnPending = false;
+        pendingBossLevel = 0;
+        grassBossTriggered = false;
+        desertBossTriggered = false;
+        iceBossTriggered = false;
+        grassBossDead = false;
+        desertBossDead = false;
+        iceBossDead = false;
+        phaseThreeBossSpawned = false;
+        bossPhaseThreeMicroDefeated = false;
+        bossPhaseThreeMicroCount = 0;
+        bossPhaseThreeMicroDefeatedCount = 0;
+        finalVictoryAchieved = false;
         cameraX = 0;
         cameraY = 0;
 
@@ -289,7 +316,7 @@ public class GameWorld {
     }
 
     private void checkBossTrigger(int playerLevel) {
-        if (overlayState != OverlayState.NONE || bossSpawnPending)
+        if (finalVictoryAchieved || overlayState != OverlayState.NONE || bossSpawnPending)
             return;
 
         if (currentLevel == 1 && !grassBossTriggered && playerLevel >= LEVEL_BOSS_GRASS) {
@@ -380,16 +407,11 @@ public class GameWorld {
                 overlayAlpha = Math.min(1f, overlayAlpha + fadeStep);
                 if (overlayAlpha >= 1f) {
                     overlayAlpha = 1f;
-                    overlayHoldMs = SCOREBOARD_HOLD_DURATION_MS;
                     overlayState = OverlayState.SCOREBOARD_HOLD;
                 }
                 break;
 
             case SCOREBOARD_HOLD:
-                overlayHoldMs -= deltaTimeMs;
-                if (overlayHoldMs <= 0) {
-                    overlayState = OverlayState.SCOREBOARD_FADE_OUT;
-                }
                 break;
 
             case SCOREBOARD_FADE_OUT:
@@ -430,6 +452,7 @@ public class GameWorld {
                 boss = new BossPhaseTwoEnemy(spawnX, spawnY);
                 break;
             case LEVEL_BOSS_ICE:
+                phaseThreeBossSpawned = true;
                 boss = new BossPhaseThreeEnemy(spawnX, spawnY);
                 break;
             default:
@@ -789,15 +812,41 @@ public class GameWorld {
     public EnemySpawner getEnemySpawner() {
         return enemySpawner;
     }
+
+    private void completeSplitBossDeathsBeforeMapChange() {
+        for (Enemy enemy : enemies) {
+            if (enemy instanceof BossEnemy
+                    && enemy.isDying()
+                    && ((BossEnemy) enemy).hasSplitDeathSequence()) {
+                enemy.forceDeathCompletion();
+            }
+        }
+    }
+
+    private boolean shouldKeepMobSpawningLocked() {
+        return phaseThreeBossSpawned || finalVictoryAchieved;
+    }
+
+    public boolean isFinalVictoryAchieved() {
+        return finalVictoryAchieved;
+    }
+
+    public void clearEnemiesForFinalVictory() {
+        enemies.clear();
+        clearEnemyProjectiles();
+    }
+
     public void trackBossPhaseThreeMicroSpawned() {
         bossPhaseThreeMicroCount++;
     }
 
     public void trackBossPhaseThreeMicroDefeated() {
         bossPhaseThreeMicroDefeatedCount++;
-        if (bossPhaseThreeMicroCount > 0 && bossPhaseThreeMicroDefeatedCount >= bossPhaseThreeMicroCount) {
+        if (bossPhaseThreeMicroDefeatedCount >= FINAL_PHASE_THREE_MICRO_BOSS_TOTAL) {
             if (!bossPhaseThreeMicroDefeated) {
                 bossPhaseThreeMicroDefeated = true;
+                finalVictoryAchieved = true;
+                enemySpawner.lockMapMobSpawning();
                 triggerScoreboard();
             }
         }

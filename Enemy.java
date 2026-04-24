@@ -263,6 +263,12 @@ public abstract class Enemy extends Sprite {
         return state == EnemyState.DEAD;
     }
 
+    public void forceDeathCompletion() {
+        if (isDying()) {
+            state = EnemyState.DEAD;
+        }
+    }
+
     public boolean consumeDefeatReward() {
         if (currentHealth > 0 || !isDead() || defeatRewardGranted) {
             return false;
