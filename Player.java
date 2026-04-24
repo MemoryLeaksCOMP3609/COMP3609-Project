@@ -8,7 +8,7 @@ public class Player {
     private static final double BASE_FIRE_RATE_MULTIPLIER = 1.0;
     private static final double BASE_PROJECTILE_COUNT_MULTIPLIER = 1.0;
     private static final double BASE_PROJECTILE_SIZE_MULTIPLIER = 1.0;
-    private static final int BASE_HEALTH_REGEN_PER_INTERVAL = 1;
+    private static final int BASE_HEALTH_REGEN_PER_INTERVAL = 10;
     private static final long HEALTH_REGEN_INTERVAL_MS = 5000L;
     private static final int BASE_LEVEL = 1;
     private static final int BASE_EXPERIENCE_TO_NEXT_LEVEL = 100;
