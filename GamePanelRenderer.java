@@ -2,12 +2,12 @@ import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Composite;
 import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
-import java.awt.FontMetrics;
 
 public class GamePanelRenderer {
 
@@ -97,7 +97,7 @@ public class GamePanelRenderer {
         if (img == null)
             return;
 
-        int alpha = world.getOverlayAlpha(); // 0-255
+        int alpha = world.getOverlayAlpha();
         if (alpha <= 0)
             return;
 
@@ -328,161 +328,218 @@ public class GamePanelRenderer {
         if (stats == null)
             return;
 
-        // Draw semi-transparent black background
-        int backdropAlpha = Math.min(200, (int) (overlayAlpha * 255));
+        int backdropAlpha = Math.min(190, (int) (overlayAlpha * 255));
         g2.setColor(new Color(0, 0, 0, backdropAlpha));
         g2.fillRect(0, 0, panelWidth, panelHeight);
 
-        // Scoreboard dimensions and positioning
-        int boardWidth = 650;
-        int boardHeight = 580;
+        int boardWidth = Math.min(760, Math.max(560, panelWidth - 120));
+        int boardHeight = Math.min(640, Math.max(520, panelHeight - 100));
         int boardX = (panelWidth - boardWidth) / 2;
         int boardY = (panelHeight - boardHeight) / 2;
+        int cornerRadius = 28;
 
-        // Draw scoreboard background and border
-        g2.setColor(new Color(0, 0, 0, 220));
-        g2.fillRect(boardX, boardY, boardWidth, boardHeight);
-
-        // Draw white border
-        g2.setColor(new Color(255, 255, 255, (int) (overlayAlpha * 255)));
-        g2.setStroke(new java.awt.BasicStroke(3));
-        g2.drawRect(boardX, boardY, boardWidth, boardHeight);
-
-        // Set up text rendering
         Composite originalComposite = g2.getComposite();
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, overlayAlpha));
 
-        g2.setColor(Color.WHITE);
-        Font titleFont = new Font("Arial", Font.BOLD, 28);
-        Font headerFont = new Font("Arial", Font.BOLD, 16);
-        Font dataFont = new Font("Arial", Font.PLAIN, 14);
-        Font indentedFont = new Font("Arial", Font.PLAIN, 12);
+        Color panelFill = new Color(18, 18, 18, 235);
+        Color panelBorder = Color.WHITE;
+        Color accentColor = new Color(255, 220, 120);
+        Color valueColor = new Color(255, 239, 196);
+        Color secondaryTextColor = Color.LIGHT_GRAY;
+        Color dividerColor = new Color(255, 255, 255, 70);
+        Color chipFill = new Color(32, 32, 32, 220);
 
-        int textX = boardX + 25;
-        int textY = boardY + 35;
-        int lineHeight = 22;
+        g2.setColor(panelFill);
+        g2.fillRoundRect(boardX, boardY, boardWidth, boardHeight, cornerRadius, cornerRadius);
+
+        g2.setStroke(new java.awt.BasicStroke(3));
+        g2.setColor(panelBorder);
+        g2.drawRoundRect(boardX, boardY, boardWidth, boardHeight, cornerRadius, cornerRadius);
+
+        int headerHeight = 70;
+        g2.setColor(new Color(36, 20, 12, 185));
+        g2.fillRoundRect(boardX + 10, boardY + 10, boardWidth - 20, headerHeight, 20, 20);
+        g2.setColor(new Color(accentColor.getRed(), accentColor.getGreen(), accentColor.getBlue(), 70));
+        g2.fillRoundRect(boardX + 10, boardY + 10, boardWidth - 20, 16, 20, 20);
+
+        Font titleFont = new Font("Arial", Font.BOLD, 30);
+        Font sectionFont = new Font("Arial", Font.BOLD, 16);
+        Font labelFont = new Font("Arial", Font.BOLD, 15);
+        Font valueFont = new Font("Arial", Font.PLAIN, 15);
+        Font detailFont = new Font("Arial", Font.PLAIN, 13);
+        Font footerFont = new Font("Arial", Font.BOLD, 16);
+
+        int sidePadding = 28;
+        int contentX = boardX + sidePadding;
+        int contentWidth = boardWidth - (sidePadding * 2);
+        int sectionTop = boardY + headerHeight + 28;
+        int leftColumnX = contentX;
+        int rightColumnX = contentX + (contentWidth / 2) + 18;
+        int columnWidth = (contentWidth / 2) - 18;
+        int rowHeight = 26;
+        int sectionGap = 20;
 
         g2.setFont(titleFont);
-        g2.drawString("FINAL STATISTICS", textX, textY);
-        textY += lineHeight + 5;
+        g2.setColor(Color.WHITE);
+        String title = "FINAL STATISTICS";
+        int titleX = boardX + (boardWidth - g2.getFontMetrics().stringWidth(title)) / 2;
+        int titleY = boardY + 34 + g2.getFontMetrics().getAscent() / 2;
+        g2.drawString(title, titleX, titleY);
 
-        g2.setStroke(new java.awt.BasicStroke(1));
-        g2.drawLine(boardX + 15, textY - 5, boardX + boardWidth - 15, textY - 5);
-        textY += 5;
+        g2.setFont(detailFont);
+        g2.setColor(accentColor);
+        String subtitle = "Your run at a glance";
+        int subtitleX = boardX + (boardWidth - g2.getFontMetrics().stringWidth(subtitle)) / 2;
+        g2.drawString(subtitle, subtitleX, boardY + 64);
 
-        // HP Accumulated
-        g2.setFont(headerFont);
-        g2.drawString("HP Accumulated:", textX, textY);
-        g2.setFont(dataFont);
-        g2.drawString("+" + stats.getHPAccumulated() + " HP", textX + 350, textY);
-        textY += lineHeight;
+        int leftY = drawScoreboardSection(g2, leftColumnX, sectionTop, columnWidth, "Progress", sectionFont,
+                accentColor, dividerColor);
+        leftY = drawScoreboardRow(g2, leftColumnX, leftY, columnWidth, "HP Accumulated",
+                (stats.getHPAccumulated() >= 0 ? "+" : "") + stats.getHPAccumulated() + " HP",
+                labelFont, valueFont, Color.WHITE, valueColor, chipFill, rowHeight);
+        leftY = drawScoreboardRow(g2, leftColumnX, leftY, columnWidth, "Crystals Collected",
+                String.valueOf(stats.getTotalCrystalsCollected()),
+                labelFont, valueFont, Color.WHITE, valueColor, chipFill, rowHeight);
+        leftY = drawScoreboardSubRow(g2, leftColumnX, leftY, columnWidth, "Tier 1",
+                String.valueOf(stats.getCrystalCountByTier(DroppedCrystal.ExperienceTier.TIER_1)),
+                detailFont, secondaryTextColor, accentColor, rowHeight - 6);
+        leftY = drawScoreboardSubRow(g2, leftColumnX, leftY, columnWidth, "Tier 2",
+                String.valueOf(stats.getCrystalCountByTier(DroppedCrystal.ExperienceTier.TIER_2)),
+                detailFont, secondaryTextColor, accentColor, rowHeight - 6);
+        leftY = drawScoreboardSubRow(g2, leftColumnX, leftY, columnWidth, "Tier 3",
+                String.valueOf(stats.getCrystalCountByTier(DroppedCrystal.ExperienceTier.TIER_3)),
+                detailFont, secondaryTextColor, accentColor, rowHeight - 6);
+        leftY = drawScoreboardSubRow(g2, leftColumnX, leftY, columnWidth, "Tier 4",
+                String.valueOf(stats.getCrystalCountByTier(DroppedCrystal.ExperienceTier.TIER_4)),
+                detailFont, secondaryTextColor, accentColor, rowHeight - 6);
+        leftY = drawScoreboardSubRow(g2, leftColumnX, leftY, columnWidth, "Health Crystals",
+                String.valueOf(stats.getHealthCrystalsCollected()),
+                detailFont, secondaryTextColor, accentColor, rowHeight - 6);
+        leftY += 8;
+        leftY = drawScoreboardRow(g2, leftColumnX, leftY, columnWidth, "Total Experience",
+                stats.getTotalExperienceGained() + " XP",
+                labelFont, valueFont, Color.WHITE, valueColor, chipFill, rowHeight);
+        leftY = drawScoreboardRow(g2, leftColumnX, leftY, columnWidth, "Time Elapsed",
+                stats.getFormattedTime(),
+                labelFont, valueFont, Color.WHITE, valueColor, chipFill, rowHeight);
 
-        // Crystals Collected
-        g2.setFont(headerFont);
-        g2.drawString("Crystals Collected:", textX, textY);
-        g2.setFont(dataFont);
-        g2.drawString(String.valueOf(stats.getTotalCrystalsCollected()), textX + 350, textY);
-        textY += lineHeight - 2;
+        int rightY = drawScoreboardSection(g2, rightColumnX, sectionTop, columnWidth, "Survival", sectionFont,
+                accentColor, dividerColor);
+        rightY = drawScoreboardRow(g2, rightColumnX, rightY, columnWidth, "Coins Collected",
+                String.valueOf(stats.getCollectiblesCollected()),
+                labelFont, valueFont, Color.WHITE, valueColor, chipFill, rowHeight);
+        rightY += sectionGap;
 
-        // Crystal tiers
-        g2.setFont(indentedFont);
-        textY += 3;
-        g2.drawString("├─ Tier 1: " + stats.getCrystalCountByTier(DroppedCrystal.ExperienceTier.TIER_1), textX + 20,
-                textY);
-        textY += lineHeight - 4;
-        g2.drawString("├─ Tier 2: " + stats.getCrystalCountByTier(DroppedCrystal.ExperienceTier.TIER_2), textX + 20,
-                textY);
-        textY += lineHeight - 4;
-        g2.drawString("├─ Tier 3: " + stats.getCrystalCountByTier(DroppedCrystal.ExperienceTier.TIER_3), textX + 20,
-                textY);
-        textY += lineHeight - 4;
-        g2.drawString("└─ Tier 4: " + stats.getCrystalCountByTier(DroppedCrystal.ExperienceTier.TIER_4), textX + 20,
-                textY);
-        textY += lineHeight + 2;
+        rightY = drawScoreboardSection(g2, rightColumnX, rightY, columnWidth, "Combat", sectionFont, accentColor,
+                dividerColor);
+        rightY = drawScoreboardRow(g2, rightColumnX, rightY, columnWidth, "Enemies Defeated",
+                String.valueOf(stats.getTotalEnemiesDefeated()),
+                labelFont, valueFont, Color.WHITE, valueColor, chipFill, rowHeight);
+        rightY = drawScoreboardSubRow(g2, rightColumnX, rightY, columnWidth, "Bats",
+                String.valueOf(stats.getEnemyDefeatCount("Bat")),
+                detailFont, secondaryTextColor, accentColor, rowHeight - 6);
+        rightY = drawScoreboardSubRow(g2, rightColumnX, rightY, columnWidth, "Normal Skeletons",
+                String.valueOf(stats.getEnemyDefeatCount("NormalSkeleton")),
+                detailFont, secondaryTextColor, accentColor, rowHeight - 6);
+        rightY = drawScoreboardSubRow(g2, rightColumnX, rightY, columnWidth, "Normal Ghosts",
+                String.valueOf(stats.getEnemyDefeatCount("NormalGhost")),
+                detailFont, secondaryTextColor, accentColor, rowHeight - 6);
+        rightY = drawScoreboardSubRow(g2, rightColumnX, rightY, columnWidth, "Toxic Skeletons",
+                String.valueOf(stats.getEnemyDefeatCount("ToxicSkeleton")),
+                detailFont, secondaryTextColor, accentColor, rowHeight - 6);
+        rightY = drawScoreboardSubRow(g2, rightColumnX, rightY, columnWidth, "Dark Ghosts",
+                String.valueOf(stats.getEnemyDefeatCount("DarkGhost")),
+                detailFont, secondaryTextColor, accentColor, rowHeight - 6);
+        rightY = drawScoreboardSubRow(g2, rightColumnX, rightY, columnWidth, "Frost Ghosts",
+                String.valueOf(stats.getEnemyDefeatCount("FrostGhost")),
+                detailFont, secondaryTextColor, accentColor, rowHeight - 6);
+        rightY += sectionGap;
 
-        // Experience Gained
-        g2.setFont(headerFont);
-        g2.drawString("Total Experience Gained:", textX, textY);
-        g2.setFont(dataFont);
-        g2.drawString(stats.getTotalExperienceGained() + " XP", textX + 350, textY);
-        textY += lineHeight;
+        rightY = drawScoreboardSection(g2, rightColumnX, rightY, columnWidth, "Bosses", sectionFont, accentColor,
+                dividerColor);
+        rightY = drawScoreboardRow(g2, rightColumnX, rightY, columnWidth, "Bosses Defeated",
+                String.valueOf(stats.getTotalBossesDefeated()),
+                labelFont, valueFont, Color.WHITE, valueColor, chipFill, rowHeight);
+        rightY = drawScoreboardSubRow(g2, rightColumnX, rightY, columnWidth, "Phase One",
+                String.valueOf(stats.getBossDefeatCount("BossPhaseOne")),
+                detailFont, secondaryTextColor, accentColor, rowHeight - 6);
+        rightY = drawScoreboardSubRow(g2, rightColumnX, rightY, columnWidth, "Phase Two",
+                String.valueOf(stats.getBossDefeatCount("BossPhaseTwo")),
+                detailFont, secondaryTextColor, accentColor, rowHeight - 6);
+        rightY = drawScoreboardSubRow(g2, rightColumnX, rightY, columnWidth, "Phase Three",
+                String.valueOf(stats.getBossDefeatCount("BossPhaseThree")),
+                detailFont, secondaryTextColor, accentColor, rowHeight - 6);
+        rightY = drawScoreboardSubRow(g2, rightColumnX, rightY, columnWidth, "Micro",
+                String.valueOf(stats.getBossDefeatCount("BossPhaseThreeMicro")),
+                detailFont, secondaryTextColor, accentColor, rowHeight - 6);
+        rightY = drawScoreboardSubRow(g2, rightColumnX, rightY, columnWidth, "Mini",
+                String.valueOf(stats.getBossDefeatCount("BossPhaseThreeMini")),
+                detailFont, secondaryTextColor, accentColor, rowHeight - 6);
 
-        // Hearts Collected
-        g2.setFont(headerFont);
-        g2.drawString("Hearts Collected:", textX, textY);
-        g2.setFont(dataFont);
-        g2.drawString(String.valueOf(stats.getHeartsCollected()), textX + 350, textY);
-        textY += lineHeight;
+        int footerY = boardY + boardHeight - 46;
+        g2.setColor(dividerColor);
+        g2.drawLine(contentX, footerY - 18, contentX + contentWidth, footerY - 18);
 
-        // Speed Boosts Collected
-        g2.setFont(headerFont);
-        g2.drawString("Speed Boosts Activated:", textX, textY);
-        g2.setFont(dataFont);
-        g2.drawString(String.valueOf(stats.getSpeedBoostsActivated()), textX + 350, textY);
-        textY += lineHeight;
-
-        // Total Enemies Defeated
-        g2.setFont(headerFont);
-        g2.drawString("Total Enemies Defeated:", textX, textY);
-        g2.setFont(dataFont);
-        g2.drawString(String.valueOf(stats.getTotalEnemiesDefeated()), textX + 350, textY);
-        textY += lineHeight - 2;
-
-        // Enemy types
-        g2.setFont(indentedFont);
-        textY += 3;
-        g2.drawString("├─ Bats: " + stats.getEnemyDefeatCount("Bat"), textX + 20, textY);
-        textY += lineHeight - 4;
-        g2.drawString("├─ Normal Skeletons: " + stats.getEnemyDefeatCount("NormalSkeleton"), textX + 20, textY);
-        textY += lineHeight - 4;
-        g2.drawString("├─ Normal Ghosts: " + stats.getEnemyDefeatCount("NormalGhost"), textX + 20, textY);
-        textY += lineHeight - 4;
-        g2.drawString("├─ Toxic Skeletons: " + stats.getEnemyDefeatCount("ToxicSkeleton"), textX + 20, textY);
-        textY += lineHeight - 4;
-        g2.drawString("├─ Dark Ghosts: " + stats.getEnemyDefeatCount("DarkGhost"), textX + 20, textY);
-        textY += lineHeight - 4;
-        g2.drawString("└─ Frost Ghosts: " + stats.getEnemyDefeatCount("FrostGhost"), textX + 20, textY);
-        textY += lineHeight + 2;
-
-        // Total Bosses Defeated
-        g2.setFont(headerFont);
-        g2.drawString("Bosses Defeated:", textX, textY);
-        g2.setFont(dataFont);
-        g2.drawString(String.valueOf(stats.getTotalBossesDefeated()), textX + 350, textY);
-        textY += lineHeight - 2;
-
-        // Boss types
-        g2.setFont(indentedFont);
-        textY += 3;
-        g2.drawString("├─ Phase One: " + stats.getBossDefeatCount("BossPhaseOne"), textX + 20, textY);
-        textY += lineHeight - 4;
-        g2.drawString("├─ Phase Two: " + stats.getBossDefeatCount("BossPhaseTwo"), textX + 20, textY);
-        textY += lineHeight - 4;
-        g2.drawString("├─ Phase Three: " + stats.getBossDefeatCount("BossPhaseThree"), textX + 20, textY);
-        textY += lineHeight - 4;
-        g2.drawString("├─ Micro: " + stats.getBossDefeatCount("BossPhaseThreeMicro"), textX + 20, textY);
-        textY += lineHeight - 4;
-        g2.drawString("└─ Mini: " + stats.getBossDefeatCount("BossPhaseThreeMini"), textX + 20, textY);
-        textY += lineHeight + 2;
-
-        // Time Elapsed
-        g2.setFont(headerFont);
-        g2.drawString("Time Elapsed:", textX, textY);
-        g2.setFont(dataFont);
-        g2.drawString(stats.getFormattedTime(), textX + 350, textY);
-        textY += lineHeight + 5;
-
-        // Bottom border
-        g2.setStroke(new java.awt.BasicStroke(1));
-        g2.drawLine(boardX + 15, textY, boardX + boardWidth - 15, textY);
-        textY += 12;
-
-        g2.setFont(new Font("Arial", Font.BOLD, 14));
-        String continueText = "Press any key to restart";
-        FontMetrics fm = g2.getFontMetrics();
-        int continueX = boardX + (boardWidth - fm.stringWidth(continueText)) / 2;
-        g2.drawString(continueText, continueX, textY);
+        g2.setFont(footerFont);
+        g2.setColor(accentColor);
+        String continueText = "Press any key to close";
+        FontMetrics footerMetrics = g2.getFontMetrics();
+        int continueX = boardX + (boardWidth - footerMetrics.stringWidth(continueText)) / 2;
+        g2.drawString(continueText, continueX, footerY);
 
         g2.setComposite(originalComposite);
+    }
+
+    private int drawScoreboardSection(Graphics2D g2, int x, int y, int width, String title, Font titleFont,
+            Color titleColor, Color dividerColor) {
+        g2.setFont(titleFont);
+        g2.setColor(titleColor);
+        g2.drawString(title, x, y);
+        y += 18;
+        g2.setColor(dividerColor);
+        g2.drawLine(x, y, x + width, y);
+        return y + 22;
+    }
+
+    private int drawScoreboardRow(Graphics2D g2, int x, int y, int width, String label, String value,
+            Font labelFont, Font valueFont, Color labelColor, Color valueColor, Color chipFill, int rowHeight) {
+        int chipWidth = 100;
+        int chipHeight = 20;
+
+        g2.setFont(labelFont);
+        g2.setColor(labelColor);
+        FontMetrics labelMetrics = g2.getFontMetrics();
+        g2.drawString(label, x, y + labelMetrics.getAscent());
+
+        int chipX = x + width - chipWidth;
+        int chipY = y - 1;
+        g2.setColor(chipFill);
+        g2.fillRoundRect(chipX, chipY, chipWidth, chipHeight, 14, 14);
+
+        g2.setFont(valueFont);
+        g2.setColor(valueColor);
+        FontMetrics valueMetrics = g2.getFontMetrics();
+        int valueX = chipX + (chipWidth - valueMetrics.stringWidth(value)) / 2;
+        int valueY = chipY + ((chipHeight - valueMetrics.getHeight()) / 2) + valueMetrics.getAscent();
+        g2.drawString(value, valueX, valueY);
+        return y + rowHeight;
+    }
+
+    private int drawScoreboardSubRow(Graphics2D g2, int x, int y, int width, String label, String value,
+            Font font, Color textColor, Color accentColor, int rowHeight) {
+        g2.setFont(font);
+        FontMetrics metrics = g2.getFontMetrics();
+        int baselineY = y + metrics.getAscent();
+
+        g2.setColor(accentColor);
+        g2.drawString("-", x + 8, baselineY);
+
+        g2.setColor(textColor);
+        g2.drawString(label, x + 24, baselineY);
+
+        int valueX = x + width - metrics.stringWidth(value);
+        g2.setColor(new Color(230, 230, 230));
+        g2.drawString(value, valueX, baselineY);
+        return y + rowHeight;
     }
 }
