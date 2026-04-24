@@ -2,7 +2,7 @@ public class BossPhaseThreeMiniEnemy extends BossEnemy {
     private static final long FRAME_DURATION = 140;
 
     public BossPhaseThreeMiniEnemy(int startX, int startY) {
-        super("Abomination Mini", 3, 200, 3, 9, 0, 0, startX, startY);
+        super("Abomination Mini", 3, 200, 8, 9, 0, 0, startX, startY);
         renderScale = 0.5;
         loadBossAnimations(
             "images/enemies/boss/bossPhase3Move.png",

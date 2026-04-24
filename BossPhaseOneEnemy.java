@@ -2,7 +2,7 @@ public class BossPhaseOneEnemy extends BossEnemy {
     private static final long FRAME_DURATION = 140;
 
     public BossPhaseOneEnemy(int startX, int startY) {
-        super("Abomination Phase 1", 1, 300, 2, 20, 100, 100, startX, startY);
+        super("Abomination Phase 1", 1, 300, 5, 20, 100, 100, startX, startY);
         loadBossAnimations(
             "images/enemies/boss/bossPhase1Move.png",
             "images/enemies/boss/bossPhase1Attack.png",

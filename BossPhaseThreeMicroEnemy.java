@@ -2,7 +2,7 @@ public class BossPhaseThreeMicroEnemy extends BossEnemy {
     private static final long FRAME_DURATION = 140;
 
     public BossPhaseThreeMicroEnemy(int startX, int startY) {
-        super("Abomination Micro", 3, 40, 3, 2, 0, 0, startX, startY);
+        super("Abomination Micro", 3, 40, 9, 2, 0, 0, startX, startY);
         renderScale = 0.25;
         loadBossAnimations(
             "images/enemies/boss/bossPhase3Move.png",
