@@ -13,7 +13,6 @@ public class GamePanel extends JPanel {
     private static final int EXPERIENCE_PER_COLLECTIBLE = 25;
     private static final long GOLDEN_TINT_DURATION = 1000;
     private static final int GOLDEN_TINT_COLOR = 0x80FFD700;
-    private static final long GAME_OVER_EXIT_DELAY = 1500;
     private static final int TARGET_FPS = 60;
     private static final long TARGET_FRAME_NANOS = 1_000_000_000L / TARGET_FPS;
     private static final int TIMER_POLL_DELAY_MS = 1;
@@ -100,7 +99,7 @@ public class GamePanel extends JPanel {
             sessionState.setCollectedCount(0);
             sessionState.setTotalCollectibles(world.getCollectibles().size());
             if (world.getPlayerData() != null) {
-                gameStats.setPlayerHealthData(world.getPlayerData().getHealth(), world.getPlayerData().getMaxHealth());
+                gameStats.syncPlayerHealth(world.getPlayerData());
             }
             world.setOnScoreboardCompleteCallback(this::onScoreboardComplete);
         }
@@ -225,36 +224,42 @@ public class GamePanel extends JPanel {
                     long deltaTimeMs = Math.max(1L,
                             Math.round(TARGET_FRAME_NANOS / 1_000_000.0));
 
-                    long t = System.nanoTime();
-                    updatePlayer(deltaTimeMs);
-                    loopMetrics.recordPlayerUpdate(System.nanoTime() - t);
-
                     int playerLevel = world.getPlayerData() != null
                             ? world.getPlayerData().getLevel()
                             : 1;
                     world.updateBossSystem(deltaTimeMs, playerLevel);
 
-                    t = System.nanoTime();
-                    combatSystem.updateEnemies(deltaTimeMs, world.getPlayer());
-                    loopMetrics.recordEnemyUpdate(System.nanoTime() - t);
+                    boolean scoreboardActive = world.isScoreboardActive();
+                    if (scoreboardActive) {
+                        gameStats.pauseTimer();
+                    } else {
+                        gameStats.resumeTimer();
+                        long t = System.nanoTime();
+                        updatePlayer(deltaTimeMs);
+                        loopMetrics.recordPlayerUpdate(System.nanoTime() - t);
 
-                    t = System.nanoTime();
-                    combatSystem.updateProjectiles(deltaTimeMs, world.getPlayer());
-                    loopMetrics.recordProjectileUpdate(System.nanoTime() - t);
+                        t = System.nanoTime();
+                        combatSystem.updateEnemies(deltaTimeMs, world.getPlayer());
+                        loopMetrics.recordEnemyUpdate(System.nanoTime() - t);
 
-                    t = System.nanoTime();
-                    world.updateWorldAnimations();
-                    world.updateScreenPositions();
-                    loopMetrics.recordAnimationUpdate(System.nanoTime() - t);
+                        t = System.nanoTime();
+                        combatSystem.updateProjectiles(deltaTimeMs, world.getPlayer());
+                        loopMetrics.recordProjectileUpdate(System.nanoTime() - t);
 
-                    t = System.nanoTime();
-                    combatSystem.checkCollisions(
-                            world.getPlayer(), world.getPlayerData(),
-                            this::queueLevelUpChoices,
-                            this::onPlayerDeath);
-                    loopMetrics.recordCollisionUpdate(System.nanoTime() - t);
+                        t = System.nanoTime();
+                        world.updateWorldAnimations();
+                        world.updateScreenPositions();
+                        loopMetrics.recordAnimationUpdate(System.nanoTime() - t);
 
-                    t = System.nanoTime();
+                        t = System.nanoTime();
+                        combatSystem.checkCollisions(
+                                world.getPlayer(), world.getPlayerData(),
+                                this::queueLevelUpChoices,
+                                this::onPlayerDeath);
+                        loopMetrics.recordCollisionUpdate(System.nanoTime() - t);
+                    }
+
+                    long t = System.nanoTime();
                     updateEffects();
                     loopMetrics.recordEffectsUpdate(System.nanoTime() - t);
 
@@ -269,12 +274,7 @@ public class GamePanel extends JPanel {
             }
 
             levelUpManager.processPendingChoices(sessionState, world, inputState, soundManager);
-
-            if (sessionState.isGameOver() && sessionState.getGameOverTime() > 0) {
-                long elapsed = System.currentTimeMillis() - sessionState.getGameOverTime();
-                if (elapsed >= GAME_OVER_EXIT_DELAY)
-                    System.exit(0);
-            }
+            gameStats.syncPlayerHealth(world.getPlayerData());
 
             loopMetrics.logProfilerIfReady(sessionState, world);
         }
@@ -441,15 +441,6 @@ public class GamePanel extends JPanel {
     public void renderToScreen(Graphics2D targetGraphics,
             int renderWidth, int renderHeight) {
         synchronized (stateLock) {
-            if (sessionState.isGameOver() && sessionState.getGameOverTime() > 0
-                    && !sessionState.isGameExiting()) {
-                long elapsed = System.currentTimeMillis() - sessionState.getGameOverTime();
-                if (elapsed >= GAME_OVER_EXIT_DELAY) {
-                    sessionState.setGameExiting(true);
-                    System.exit(0);
-                }
-            }
-
             setViewportSize(renderWidth, renderHeight);
             ensureRenderBuffer(renderWidth, renderHeight);
 

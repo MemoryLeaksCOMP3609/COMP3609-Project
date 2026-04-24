@@ -96,6 +96,10 @@ public class GameCombatSystem {
         for (Enemy removedEnemy : removedEnemies) {
             removedEnemy.onRemoved(world);
         }
+
+        if (world.isFinalVictoryAchieved()) {
+            world.clearEnemiesForFinalVictory();
+        }
     }
 
     private void updateBatEnemy(Enemy enemy, PlayerSprite player, long deltaTimeMs, double distanceToPlayer) {
@@ -186,12 +190,11 @@ public class GameCombatSystem {
                 player.activateSpeedBoost();
                 if (gameStats != null) {
                     gameStats.recordSpeedBoost();
+                    gameStats.recordCollectibleCollected();
+                    gameStats.recordExperienceGained(experiencePerCollectible);
                 }
                 sessionState.setGoldenTintActive(true);
                 sessionState.setGoldenTintTimer(goldenTintDurationMs);
-                if (gameStats != null) {
-                    gameStats.recordHeartCollected();
-                }
                 int levelsGained = playerData != null ? playerData.gainExperience(experiencePerCollectible) : 0;
                 queueLevelUpChoices.accept(levelsGained);
                 world.respawnCollectedCollectible(collectible);

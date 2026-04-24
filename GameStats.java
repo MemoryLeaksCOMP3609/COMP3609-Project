@@ -2,11 +2,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class GameStats {
-    private int basePlayerHealth;
-    private int currentPlayerHealth;
+    private int basePlayerMaxHealth;
+    private int currentPlayerMaxHealth;
     private int totalExperienceGained;
-    private int heartsCollected;
+    private int collectiblesCollected;
     private long sessionStartTimeMs;
+    private long totalPausedDurationMs;
+    private long timerPausedAtMs;
+    private boolean timerPaused;
     private int speedBoostsActivated;
 
     private Map<DroppedCrystal.CrystalType, Map<DroppedCrystal.ExperienceTier, Integer>> crystalsByType;
@@ -15,11 +18,14 @@ public class GameStats {
     private Map<String, Integer> bossDefeats;
 
     public GameStats() {
-        basePlayerHealth = 5000; // Player's Base HP
-        currentPlayerHealth = basePlayerHealth;
+        basePlayerMaxHealth = 0;
+        currentPlayerMaxHealth = 0;
         totalExperienceGained = 0;
-        heartsCollected = 0;
+        collectiblesCollected = 0;
         sessionStartTimeMs = System.currentTimeMillis();
+        totalPausedDurationMs = 0;
+        timerPausedAtMs = 0;
+        timerPaused = false;
 
         crystalsByType = new HashMap<>();
         crystalsByType.put(DroppedCrystal.CrystalType.EXPERIENCE, new HashMap<>());
@@ -46,12 +52,15 @@ public class GameStats {
     }
 
     public void resetSession() {
-        basePlayerHealth = 5000;
-        currentPlayerHealth = basePlayerHealth;
+        basePlayerMaxHealth = 0;
+        currentPlayerMaxHealth = 0;
         totalExperienceGained = 0;
-        heartsCollected = 0;
+        collectiblesCollected = 0;
         speedBoostsActivated = 0;
         sessionStartTimeMs = System.currentTimeMillis();
+        totalPausedDurationMs = 0;
+        timerPausedAtMs = 0;
+        timerPaused = false;
 
         crystalsByType.get(DroppedCrystal.CrystalType.EXPERIENCE).clear();
         crystalsByType.get(DroppedCrystal.CrystalType.HEALTH).clear();
@@ -78,10 +87,13 @@ public class GameStats {
     }
 
     public void recordCrystalCollected(DroppedCrystal.CrystalType type, DroppedCrystal.ExperienceTier tier) {
-        if (type == null || tier == null)
+        if (type == null)
             return;
 
         if (type == DroppedCrystal.CrystalType.EXPERIENCE) {
+            if (tier == null) {
+                return;
+            }
             Map<DroppedCrystal.ExperienceTier, Integer> tierCounts = crystalsByType.get(type);
             tierCounts.put(tier, tierCounts.getOrDefault(tier, 0) + 1);
         } else if (type == DroppedCrystal.CrystalType.HEALTH) {
@@ -95,8 +107,8 @@ public class GameStats {
         }
     }
 
-    public void recordHeartCollected() {
-        heartsCollected++;
+    public void recordCollectibleCollected() {
+        collectiblesCollected++;
     }
 
     public void recordEnemyDefeated(Enemy enemy) {
@@ -147,13 +159,20 @@ public class GameStats {
         }
     }
 
-    public void setPlayerHealthData(int currentHealth, int maxHealth) {
-        this.currentPlayerHealth = currentHealth;
-        this.basePlayerHealth = maxHealth;
+    public void syncPlayerHealth(Player player) {
+        if (player == null) {
+            return;
+        }
+
+        int maxHealth = player.getMaxHealth();
+        if (basePlayerMaxHealth <= 0) {
+            basePlayerMaxHealth = maxHealth;
+        }
+        currentPlayerMaxHealth = maxHealth;
     }
 
     public int getHPAccumulated() {
-        return currentPlayerHealth - basePlayerHealth;
+        return Math.max(0, currentPlayerMaxHealth - basePlayerMaxHealth);
     }
 
     public int getTotalCrystalsCollected() {
@@ -176,8 +195,8 @@ public class GameStats {
         return totalExperienceGained;
     }
 
-    public int getHeartsCollected() {
-        return heartsCollected;
+    public int getCollectiblesCollected() {
+        return collectiblesCollected;
     }
 
     public int getTotalEnemiesDefeated() {
@@ -196,8 +215,26 @@ public class GameStats {
         return bossDefeats.getOrDefault(bossType, 0);
     }
 
+    public void pauseTimer() {
+        if (timerPaused) {
+            return;
+        }
+        timerPaused = true;
+        timerPausedAtMs = System.currentTimeMillis();
+    }
+
+    public void resumeTimer() {
+        if (!timerPaused) {
+            return;
+        }
+        totalPausedDurationMs += System.currentTimeMillis() - timerPausedAtMs;
+        timerPaused = false;
+        timerPausedAtMs = 0;
+    }
+
     public long getTimeElapsedMs() {
-        return System.currentTimeMillis() - sessionStartTimeMs;
+        long currentTimeMs = timerPaused ? timerPausedAtMs : System.currentTimeMillis();
+        return Math.max(0, currentTimeMs - sessionStartTimeMs - totalPausedDurationMs);
     }
 
     public String getFormattedTime() {
