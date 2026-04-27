@@ -77,7 +77,7 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
     private TestBossSpawnType selectedTestBossButton;
 
     public GameWindow() {
-        super("Coin Collector");
+        super("Bella's Nightmare");
 
         device = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
         infoPanel = new InfoPanel();
@@ -105,7 +105,7 @@ public class GameWindow extends JFrame implements ActionListener, KeyListener, M
         launcherPanel.setBackground(Color.BLACK);
         launcherPanel.setBorder(BorderFactory.createEmptyBorder(120, 120, 120, 120));
 
-        JLabel titleLabel = new JLabel("Coin Collector");
+        JLabel titleLabel = new JLabel("Bella's Nightmare");
         titleLabel.setFont(new Font("Arial", Font.BOLD, 42));
         titleLabel.setForeground(Color.WHITE);
         titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
