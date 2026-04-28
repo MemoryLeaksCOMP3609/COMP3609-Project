@@ -126,7 +126,7 @@ public class GamePanelRenderer {
     private void drawStartScreen(Graphics2D g2, int panelWidth, int panelHeight) {
         g2.setColor(Color.WHITE);
         g2.setFont(new Font("Arial", Font.BOLD, 36));
-        String title = "Bella's Nightmare";
+        String title = "Three Realms Survival";
         int titleX = (panelWidth - g2.getFontMetrics().stringWidth(title)) / 2;
         int titleY = panelHeight / 2 - 20;
         g2.drawString(title, titleX, titleY);

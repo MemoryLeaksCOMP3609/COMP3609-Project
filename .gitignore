@@ -270,7 +270,8 @@ site/
 # Exclude all example directories
 example/
 Examples/
-#plans/
+plans/
+documentation/
 # -----------------------------------------------------------------------------
 # 10. ADDITIONAL JAVA SPECIFIC PATTERNS
 # -----------------------------------------------------------------------------
