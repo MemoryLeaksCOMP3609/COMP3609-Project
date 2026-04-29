@@ -266,12 +266,6 @@ site/
 # 
 # Current decision: EXCLUDE Examples/ as they are reference materials,
 # not part of your assignment submission.
-
-# Exclude all example directories
-example/
-Examples/
-plans/
-documentation/
 # -----------------------------------------------------------------------------
 # 10. ADDITIONAL JAVA SPECIFIC PATTERNS
 # -----------------------------------------------------------------------------
