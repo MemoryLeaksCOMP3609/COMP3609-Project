@@ -36,7 +36,8 @@ public class SoundManager {
         loadClip("spell-attack-noise", "sounds/spell-attack-noise.wav");
         loadClip("enemy-hurt", "sounds/enemy-hurt.wav");
         loadClip("portal-sound", "sounds/portal-sound.wav");
-        loadClip("crystal-sound", "sounds/crystal-sound.wav");
+        loadClip("crystalPickup", "sounds/crystalPickup.wav");
+        loadClip("healthPickup", "sounds/healthPickup.wav");
     }
 
     public static SoundManager getInstance() {

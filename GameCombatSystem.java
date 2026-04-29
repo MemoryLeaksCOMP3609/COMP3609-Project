@@ -211,9 +211,9 @@ public class GameCombatSystem {
             DroppedCrystal crystal = crystalIterator.next();
             if (!crystal.isCollected() && playerBounds.intersects(crystal.getBoundingRectangle())) {
                 crystal.collect();
-                soundManager.playClip("crystal-sound", false);
                 if (playerData != null) {
                     if (crystal.getType() == DroppedCrystal.CrystalType.EXPERIENCE) {
+                        soundManager.playClip("crystalPickup", false);
                         int expValue = crystal.getExperienceValue();
                         queueLevelUpChoices.accept(playerData.gainExperience(expValue));
                         if (gameStats != null) {
@@ -221,6 +221,7 @@ public class GameCombatSystem {
                             gameStats.recordExperienceGained(expValue);
                         }
                     } else if (crystal.getType() == DroppedCrystal.CrystalType.HEALTH) {
+                        soundManager.playClip("healthPickup", false);
                         playerData.heal(HEALTH_PER_CRYSTAL);
                         if (gameStats != null) {
                             gameStats.recordCrystalCollected(crystal.getType(), null);
